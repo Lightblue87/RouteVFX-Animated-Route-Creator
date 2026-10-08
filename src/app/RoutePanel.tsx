@@ -3,7 +3,7 @@ import { useI18n } from './App';
 import type { ProjectApi } from './Editor';
 import { PlannerMap } from './PlannerMap';
 import { loadAirports, loadPlaces, searchNominatim, searchOffline, type Place } from '../adapters/geocoding';
-import { createOsrmProvider } from '../adapters/routing/osrm';
+import { createOnlineRoutingProvider } from '../adapters/routing/config';
 import type { RoutingSettings } from '../adapters/routing/registry';
 import { addStop, applyControlPoints, appendGpxTrack, controlPointsOf, changeSegmentMode, LatestRequestGate, markOnlineUsed, fillMissingSegments, missingPairs, moveStop, normalizeSegments, replaceSegmentIfUnchanged, removeStop, updateSegment, updateStop } from '../features/projects/journey';
 import { GPX_MAX_BYTES, GpxError, parseGpx } from '../features/imports/gpx';
@@ -11,7 +11,7 @@ import { TRANSPORT_MODES, type GeoPoint, type TransportMode } from '../core/type
 import { formatKm, type MessageKey } from '../i18n';
 
 const ONLINE_KEY = 'arc.onlineAllowed';
-const osrm = createOsrmProvider();
+const onlineRouting = createOnlineRoutingProvider();
 
 export function useOnlineSetting(): [boolean, (v: boolean) => void] {
   const [v, setV] = useState(() => {
@@ -32,7 +32,7 @@ export function RoutePanel({ api }: { api: ProjectApi }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [online, setOnline] = useOnlineSetting();
-  const settings: RoutingSettings = useMemo(() => ({ onlineAllowed: online, online: osrm }), [online]);
+  const settings: RoutingSettings = useMemo(() => ({ onlineAllowed: online, online: onlineRouting }), [online]);
   const fileRef = useRef<HTMLInputElement>(null);
   const [editId, setEditId] = useState<string | null>(null);
   const editSeg = project.journey.segments.find((s) => s.id === editId) ?? null;
@@ -249,7 +249,7 @@ export function RoutePanel({ api }: { api: ProjectApi }) {
         </ol>
         <label className="toggle small">
           <input type="checkbox" checked={online} onChange={(e) => setOnline(e.target.checked)} data-testid="online-toggle" />
-          {t('route.onlineToggle')}
+          {t('route.onlineToggle', { router: onlineRouting.id === 'ors-proxy' ? 'openrouteservice (HeiGIT) · Supabase' : 'FOSSGIS-OSRM' })}
         </label>
       </div>
     </div>

@@ -61,6 +61,12 @@ GPS-Aufzeichnung · Kartenlink-Import · Service-Worker-Update-Ablauf · Re-Rout
 - Tests (Sandbox): Typecheck ohne Fehler; Vitest 75/75; Nicht-Export-E2E 10/10 (Playwright-Chromium 1194), darunter 2 neue OpenFreeMap-Tests mit **simuliertem** Dienst (synthetische Kacheln); Screenshots manuell geprüft.
 - **Nicht getestet:** echter Dienst tiles.openfreemap.org (Sandbox blockiert), MP4-Export mit OpenFreeMap-Stil (kein H.264-Chrome in dieser Sitzung), Geräte.
 
+## Stand 2026-10-08 – Arbeitsschritt 3 (Routing-Proxy, R-03)
+- Geliefert: Supabase Edge Function `route` (Proxy zu openrouteservice) mit Origin-Allowlist, Kill-Switch, Tages-Kontingenten in Postgres (Migration), Client-Adapter `orsProxy`, Auswahl per `VITE_ROUTING_PROXY_URL`, CSP-Erweiterung, Einrichtungsanleitung `docs/SUPABASE_ROUTING.md`.
+- Tests (Sandbox): Vitest 92/92 (u. a. 13 Proxy-/Adapter-Tests, 3 SQL-Tests in PGlite); `deno check` der Function (auch in CI); echter Deno-Lauf der Function mit simulierter Supabase-DB (403/204/429/502 wie erwartet).
+- **Nicht getestet:** echtes Supabase-Projekt und echter ORS-Aufruf (Sandbox blockiert api.openrouteservice.org), Geräte.
+- **Nächster Schritt für dich:** Supabase-Projekt anlegen und Function nach `docs/SUPABASE_ROUTING.md` deployen; danach teste ich live.
+
 ## Phasenplan
 
 | Phase | Inhalt | Stand |

@@ -35,7 +35,7 @@ export const en: Record<keyof typeof de, string> = {
   'route.down': 'Move down',
   'route.alternative': 'Alternative {n}',
   'route.recompute': 'Recompute',
-  'route.onlineToggle': 'Allow online services (routing: FOSSGIS OSRM, search: Nominatim). Coordinates or search terms are sent to these providers.',
+  'route.onlineToggle': 'Allow online services (routing: {router}, search: Nominatim). Coordinates or search terms are sent to these providers.',
   'route.offlineBadge': 'Offline data',
   'route.total': 'Total: {km}',
   'route.gpxError': 'Could not read GPX: {reason}',
