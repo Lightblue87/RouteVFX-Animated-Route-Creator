@@ -1,0 +1,74 @@
+import 'fake-indexeddb/auto';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { deleteProject, duplicateProject, getBlob, pruneUnreferencedBlobs, listProjects, loadProject, putBlob, saveProject, _resetDbHandle } from '../../src/adapters/storage/idb';
+import { multimodalProject } from '../fixtures/project';
+import { openDB } from 'idb';
+
+describe('IndexedDB storage', () => {
+  beforeEach(async () => {
+    await _resetDbHandle();
+    await new Promise((r) => { const q = indexedDB.deleteDatabase('arc-local'); q.onsuccess = q.onerror = q.onblocked = r; });
+  });
+  it('save → reload (new handle) returns identical project', async () => {
+    const p = await multimodalProject();
+    await saveProject(p);
+    await _resetDbHandle();
+    expect(await loadProject(p.id)).toEqual(p);
+  });
+  it('broken records are reported, not deleted', async () => {
+    const p = await multimodalProject();
+    await saveProject(p);
+    const db = await openDB('arc-local', 1);
+    await db.put('projects', { id: 'broken-1', schemaVersion: 1, title: 5 });
+    db.close();
+    const r = await listProjects();
+    expect(r.projects).toHaveLength(1);
+    expect(r.broken).toEqual([{ id: 'broken-1', error: 'invalid' }]);
+    const db2 = await openDB('arc-local', 1);
+    expect(await db2.get('projects', 'broken-1')).toBeTruthy();
+    db2.close();
+  });
+  it('delete removes project and its blobs', async () => {
+    const p = await multimodalProject();
+    await saveProject(p);
+    await putBlob({ id: 'b1', projectId: p.id, name: 'a.mp3', type: 'audio/mpeg', size: 3, blob: new Blob(['abc']) });
+    expect(await getBlob('b1')).toBeTruthy();
+    await deleteProject(p.id);
+    expect(await loadProject(p.id)).toBeNull();
+    expect(await getBlob('b1')).toBeUndefined();
+  });
+  it('refuses to persist invalid projects', async () => {
+    const p = await multimodalProject();
+    await expect(saveProject({ ...p, targetDurationMs: 999_999 })).rejects.toThrow();
+  });
+  it('duplicate copies the audio blob, so deleting the original keeps the copy intact', async () => {
+    const p = await multimodalProject();
+    await putBlob({ id: 'a1', projectId: p.id, name: 'm.mp3', type: 'audio/mpeg', size: 3, blob: new Blob(['abc']) });
+    const withAudio = { ...p, audio: { assetId: 'a1', fileName: 'm.mp3', gain: 1, fadeInMs: 0, fadeOutMs: 0, muted: false } };
+    await saveProject(withAudio);
+    const copy = await duplicateProject(withAudio, 'Kopie');
+    expect(copy.id).not.toBe(p.id);
+    expect(copy.audio!.assetId).not.toBe('a1');
+    await deleteProject(p.id);
+    expect(await getBlob('a1')).toBeUndefined();
+    const copied = await getBlob(copy.audio!.assetId);
+    expect(copied?.projectId).toBe(copy.id);
+    expect(copied).toMatchObject({ name: 'm.mp3', type: 'audio/mpeg', size: 3 }); // Blob-Inhalt: fake-indexeddb/jsdom stellt Blob-Methoden nicht wieder her
+    expect((await loadProject(copy.id))?.title).toBe('Kopie');
+  });
+  it('prunes only unreferenced blobs of the given project', async () => {
+    const p = await multimodalProject();
+    const other = await multimodalProject();
+    const blob = (id: string, projectId: string) => putBlob({ id, projectId, name: 'm.mp3', type: 'audio/mpeg', size: 3, blob: new Blob(['abc']) });
+    await blob('keep', p.id);
+    await blob('old1', p.id);
+    await blob('old2', p.id);
+    await blob('foreign', other.id);
+    expect(await pruneUnreferencedBlobs(p.id, ['keep'])).toBe(2);
+    expect(await getBlob('keep')).toBeDefined();
+    expect(await getBlob('old1')).toBeUndefined();
+    expect(await getBlob('old2')).toBeUndefined();
+    expect(await getBlob('foreign')).toBeDefined();
+  });
+});
+
