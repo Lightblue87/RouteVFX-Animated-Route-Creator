@@ -118,6 +118,7 @@ export const en: Record<keyof typeof de, string> = {
   'export.progress': 'Rendering frame {i} / {n}',
   'export.prepare': 'Preparing map and encoder …',
   'export.finalizing': 'Finalizing MP4 …',
+  'export.mapFallback': 'The online map was unreachable – the video was rendered with the simple offline map (Natural Earth).',
   'export.done': 'Done: {size}, {codec}',
   'export.save': 'Download',
   'export.share': 'Share',

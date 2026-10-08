@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { validateStyleMin } from '@maplibre/maplibre-gl-style-spec';
 import { buildStyle, getStyleInfo, MAP_STYLES } from '../../src/adapters/maps/styles';
 import { OPENFREEMAP } from '../../src/adapters/maps/openfreemap';
+import { isOnlineMapReachable } from '../../src/adapters/maps/availability';
 
 const BASE = 'https://app.example/';
 
@@ -47,7 +48,20 @@ describe('Detailkarte (OpenFreeMap)', () => {
     const cfg = readFileSync(join(__dirname, '../../vite.config.ts'), 'utf8');
     expect(cfg).toMatch(/connect-src[^"]*https:\/\/tiles\.openfreemap\.org/);
   });
-  it('ships the licence file of the bundled styles', () => {
-    expect(readFileSync(join(__dirname, '../../src/adapters/maps/openfreemap/LICENSE.md'), 'utf8')).toMatch(/CC BY 4\.0/);
+  it('ships the licence notices of both bundled styles (Positron and Dark Matter, BSD-3 + CC BY 4.0)', () => {
+    const lic = readFileSync(join(__dirname, '../../src/adapters/maps/openfreemap/LICENSE.md'), 'utf8');
+    expect(lic).toMatch(/CC BY 4\.0/);
+    expect(lic).toMatch(/positron-gl-style/);
+    expect(lic).toMatch(/dark-matter-gl-style/);
+    expect(lic.match(/Redistributions in binary form must reproduce/g)?.length).toBeGreaterThanOrEqual(2);
+  });
+  it('export pre-check: reachable only if the TileJSON answers with tiles; errors and timeouts count as unreachable', async () => {
+    const ok = (body: unknown, status = 200) => async () => new Response(JSON.stringify(body), { status });
+    expect(await isOnlineMapReachable(ok({ tiles: ['https://tiles.openfreemap.org/planet/x/{z}/{x}/{y}.pbf'] }) as never)).toBe(true);
+    expect(await isOnlineMapReachable(ok({ tiles: [] }) as never)).toBe(false);
+    expect(await isOnlineMapReachable(ok({}, 503) as never)).toBe(false);
+    expect(await isOnlineMapReachable((async () => { throw new TypeError('Failed to fetch'); }) as never)).toBe(false);
+    const hang = ((_u: string, init: RequestInit) => new Promise((_, rej) => init.signal!.addEventListener('abort', () => rej(new Error('aborted'))))) as never;
+    expect(await isOnlineMapReachable(hang, 20)).toBe(false);
   });
 });

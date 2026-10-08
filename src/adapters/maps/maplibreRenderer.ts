@@ -1,5 +1,5 @@
 import './setup';
-import { Map as MlMap } from 'maplibre-gl';
+import { Map as MlMap, type ErrorEvent } from 'maplibre-gl';
 import { LOGICAL_VIEWPORT, type CameraState, type SceneState } from '../../core/scene/evaluate';
 import { drawOverlay, type OverlayOptions } from '../../scene/drawOverlay';
 import { buildStyle, type LabelLang } from './styles';
@@ -44,7 +44,15 @@ export class MapLibreSceneRenderer {
     });
     this.ready = new Promise((resolve, reject) => {
       this.map.once('load', () => resolve());
-      this.map.once('error', (e) => reject(e.error ?? new Error('map error')));
+      // Nur Fehler des Stils selbst sind fatal. Fehler einzelner Quellen (z. B. Online-Kacheln) dürfen die
+      // Karte nicht blockieren: Natural Earth darunter bleibt nutzbar.
+      const onError = (e: ErrorEvent & { sourceId?: string }) => {
+        if (e.sourceId) return;
+        this.map.off('error', onError);
+        reject(e.error ?? new Error('map error'));
+      };
+      this.map.on('error', onError);
+      this.map.once('load', () => this.map.off('error', onError));
     });
   }
 

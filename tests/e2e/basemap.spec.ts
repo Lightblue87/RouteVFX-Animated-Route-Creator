@@ -99,4 +99,7 @@ test('Detailkarte OpenFreeMap: Stil übersteht Reload; ohne erreichbaren Dienst 
   await expect(page.getByTestId('map-style')).toHaveValue('ofm-dark');
   await page.waitForTimeout(1500);
   await page.getByTestId('preview-canvas').locator('..').screenshot({ path: 'test-results/basemap-ofm-offline.png' });
+  // Planungskarte wird trotz ausgefallener Kartenquelle fertig geladen (Routen-/Stopp-Ebenen werden erst danach angelegt)
+  await page.getByTestId('tab-route').click();
+  await expect(page.getByTestId('planner-map')).toHaveAttribute('aria-busy', 'false');
 });

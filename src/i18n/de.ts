@@ -116,6 +116,7 @@ export const de = {
   'export.progress': 'Rendere Frame {i} / {n}',
   'export.prepare': 'Karte und Encoder werden vorbereitet …',
   'export.finalizing': 'MP4 wird abgeschlossen …',
+  'export.mapFallback': 'Die Online-Karte war nicht erreichbar – das Video wurde mit der einfachen Offline-Karte (Natural Earth) erstellt.',
   'export.done': 'Fertig: {size}, {codec}',
   'export.save': 'Herunterladen',
   'export.share': 'Teilen',
