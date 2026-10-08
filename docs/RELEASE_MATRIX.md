@@ -20,7 +20,7 @@ Testartefakte (MP4/JSON) werden lokal unter `test-results/` erzeugt und nicht ei
 **Hinweis:** „PASS (Sandbox)“ belegt nur, dass Pipeline und Datei korrekt sind (kurze Clips). Lange Exporte (bis 180 s) und alle realen Geräte sind ungetestet; 4K wird bis zum Gerätenachweis nicht freigegeben.
 
 ## Abnahmeszenarien
-Siehe `ACCEPTANCE.md`. Zusammenfassung: 1 OFFEN (teilw.) · 2 PASS (Sandbox) · 3 OFFEN (teilw.) · 4 PASS (Unit + E2E Sandbox) · 5 PASS (Sandbox) · 6 PASS (Unit, Determinismus; Keyframes offen) · 7 OFFEN · 8 BLOCKED_EXTERNAL/OFFEN · 9 PASS (Sandbox-Dateien) · 10 OFFEN (Abbruch PASS) · 11 OFFEN (Reload PASS) · 12 OFFEN · 13 PASS (Sandbox) · 14 DEFERRED (Freigabe ausstehend).
+Siehe `ACCEPTANCE.md`. Zusammenfassung: 1 OFFEN (teilw.) · 2 PASS (Sandbox) · 3 OFFEN (teilw.) · 4 PASS (Unit + E2E Sandbox) · 5 PASS (Sandbox) · 6 PASS (Unit, Determinismus; Keyframes offen) · 7 OFFEN · 8 BLOCKED_EXTERNAL/OFFEN · 9 PASS (Sandbox-Dateien) · 10 OFFEN (Abbruch PASS) · 11 OFFEN (Reload PASS) · 12 OFFEN · 13 PASS (Sandbox) · 14 DEFERRED_APPROVED (Phase 6, freigegeben 2026-10-08).
 
 **Kein Szenario ist auf realen Geräten bestanden → keine Freigabe.**
 

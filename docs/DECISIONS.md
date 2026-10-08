@@ -28,7 +28,9 @@ Versionen exakt gepinnt (`package.json` ohne `^`, `package-lock.json`). TypeScri
 | MapLibre + OSM-Vektorkacheln (OpenFreeMap / selbst gehostete PMTiles) | ODbL-Daten mit Attribution; OpenFreeMap-Bedingungen nicht abrufbar | Voraussichtlich mit Attribution, **nicht verifiziert** (E04) | Unbekannt – nächster Kandidat |
 | tile.openstreetmap.org | OSMF-Richtlinie verbietet Bulk/Offline-Prefetch | Nicht als Exportfarm zulässig | Ausgeschlossen |
 
-Entscheidung: Renderer und Datenquelle sind getrennt (`src/adapters/maps/styles.ts` Capability-Matrix). Natural Earth liefert nur Länder, Küsten, Seen – für Straßen-/Stadt-Detail ist eine zweite, exportlizenzierte Quelle nötig (Risiko R-02).
+Entscheidung: Renderer und Datenquelle sind getrennt (`src/adapters/maps/styles.ts` Capability-Matrix). Natural Earth liefert nur Länder, Küsten, Seen – für Straßen-/Stadt-Detail ist eine zweite, exportlizenzierte Quelle nötig (Risiko R-01).
+
+**Produktentscheidung 2026-10-08 (Produktverantwortlicher):** Detailkarte = **OSM-Vektorkacheln als selbst gehostete PMTiles-Datei** auf statischem Hosting, gerendert mit MapLibre. Begründung: keine Abhängigkeit von Dritt-Kachelservern, Offline-/Exportnutzung unter eigener Kontrolle, ODbL-Attribution im UI und Video. Status: `Anforderung` – nicht implementiert. Vor Umsetzung offen: Dateigröße/Ausschnitt (Planet vs. Regionen), Freikontingent und Range-Request-Unterstützung des statischen Hostings (E12), Style- und Schriftlizenzen (E11), ODbL-Pflichten für erzeugte Videos (E04). Natural Earth bleibt Fallback/Offline-Basis. Umsetzung in einem Folge-PR.
 
 ## ADR-003 Videoexport
 
@@ -51,6 +53,8 @@ Audio: AAC über WebCodecs `AudioEncoder`; **in der Sandbox nicht verfügbar** (
 | Schiff, Bahn, Bus | keine lizenzierte Datenquelle → lokale Näherung | `estimated` + Warnung |
 
 Begründung: Kein kostenloser, für öffentliche Produktionsnutzung bestätigter Routingdienst gefunden (E05). Der FOSSGIS-Server ist ein Best-Effort-Demodienst; Bedingungen konnten in dieser Sitzung nicht abgerufen werden. Deshalb Opt-in, Drosselung (1 Anfrage/s) und gekennzeichneter Fallback. Ausstiegspfad: openrouteservice/GraphHopper (Free-Tier mit Schlüssel – Bedingungen prüfen) oder selbst gehostetes OSRM/Valhalla (Kosten → Freigabe nötig).
+
+**Produktentscheidung 2026-10-08 (Produktverantwortlicher):** Für den öffentlichen Betrieb wird ein **Routinganbieter mit kostenlosem Kontingent und API-Schlüssel** verwendet (Kandidaten: openrouteservice, GraphHopper). Bedingungen: kein kostenpflichtiger Tarif, keine Kreditkartenpflicht ohne erneute Freigabe; Nutzungsbedingungen (Persistenz der Geometrie, Attribution, kommerzielle/öffentliche Nutzung, Schlüssel im Client vs. Proxy) und Limits werden vor Auswahl in `EXTERNAL_EVIDENCE.md` (E05/E12) belegt; harte Drosselung und Kill-Switch. FOSSGIS-OSRM bleibt bis dahin nur Opt-in-Prototyp und wird vor öffentlichem Start ersetzt. Status: `Anforderung` – Umsetzung in einem Folge-PR.
 
 ## ADR-005 Geocoding
 
@@ -101,13 +105,13 @@ Repository `RouteVFX-Animated-Route-Creator` mit Logo-Assets → App-Name „Rou
 | 20 | Max. 3 Minuten | Verifiziert (Unit) | Schema lehnt > 180 s ab. |
 | 21 | Lokal ohne Konto | Teilweise verifiziert | IndexedDB-Integrationstests + E2E Reload. |
 | 22 | Download, Share-Sheet; keine öffentlichen Links | Download verifiziert; Share implementiert, ungetestet (E13) | |
-| 23 | Konto E-Mail/Passwort | Nicht begonnen (Phase 6) | |
+| 23 | Konto E-Mail/Passwort | Nicht begonnen (Phase 6) | Szenario 14 am 2026-10-08 als DEFERRED_APPROVED auf Phase 6 zurückgestellt. |
 | 24 | Kostenlos ohne Registrierung | Implementiert | Keine Kontofunktion vorhanden. |
 | 25 | Cloud-Sync später | Nicht begonnen (Phase 6) | |
 | 26 | GPS-Daten bleiben lokal | Anforderung | GPS nicht begonnen; keinerlei Uploads im Code. |
 | 27 | Kostenloses Hosting | Nicht begonnen | Nicht veröffentlicht. |
 | 28 | Premium vorbereiten | Nicht begonnen | |
-| 29 | Admin | Nicht begonnen (Phase 6) | |
+| 29 | Admin | Nicht begonnen (Phase 6) | Szenario 14 am 2026-10-08 als DEFERRED_APPROVED auf Phase 6 zurückgestellt. |
 | 30 | iPhone & Android gleichwertig | Nicht verifiziert | Keine Gerätetests möglich in Sandbox. |
 | 31 | Mobile-first UI | Implementiert | Nur emuliert (Pixel 7) getestet. |
 | 32 | DE + EN | Implementiert | EN-Wörterbuch typgeprüft vollständig. |

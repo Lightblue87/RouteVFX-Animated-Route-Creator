@@ -45,10 +45,13 @@
 ### Ausdrücklich offen / nicht getestet
 GPS-Aufzeichnung · Kartenlink-Import · Service-Worker-Update-Ablauf · Re-Routing über Ziehpunkte (online) · Routing-Wegpunkte-UI · Touch-Ziehen auf echten Geräten · Timeline-Keyframes · erweiterter Editor · Fotos/Clips/Logos · Voice-over · SFX/Musikbibliothek · Effekte/Übergänge · 2D-Upload/3D-Modelle · Audio im Export · Web Share · Offline-Betrieb · Reload-Persistenz im Browser · alle Gerätetests (iPhone/Android) · Accessibility-Prüfung · Admin/Cloud.
 
-### Blocker (deine Entscheidung nötig)
-1. **Kartenquelle mit Straßen/Städten (R-01):** Natural Earth ist lizenzsauber, aber grob. Optionen: (a) OSM-Vektorkacheln selbst als PMTiles auf statischem Hosting (kostenlos möglich, Lizenz ODbL mit Attribution im Video; Datengröße/Hosting-Limits zu prüfen) oder (b) OpenFreeMap-Instanz (Bedingungen müssen verifiziert werden). Apple MapKit erfordert eine kostenpflichtige Mitgliedschaft und hat keine nachgewiesene Exporterlaubnis.
-2. **Routing (R-03):** FOSSGIS-Demo ist nur Best-Effort. Für öffentlichen Betrieb Anbieter mit Schlüssel (Free-Tier) oder Selbsthosting (Kosten) – Freigabe nötig.
-3. **Gerätetests:** Ein iPhone und ein Android-Gerät müssen den Prototyp ausführen; ohne das bleiben alle Exportprofile auf „Sandbox“.
+### Entscheidungen des Produktverantwortlichen (2026-10-08)
+1. **Kartenquelle mit Straßen/Städten (R-01):** OSM-Vektorkacheln als **selbst gehostete PMTiles** (ODbL-Attribution in UI und Video). Umsetzung in Folge-PR; Größe/Hosting-Limits vorher belegen.
+2. **Routing (R-03):** **Free-Tier mit API-Schlüssel** (openrouteservice oder GraphHopper), ohne Kosten/Kreditkarte; Bedingungen vor Auswahl belegen. FOSSGIS-OSRM bleibt bis dahin Opt-in-Prototyp.
+3. **Szenario 14 (Backend/Admin):** `DEFERRED_APPROVED` auf Phase 6.
+
+### Weiterhin offen (kein Merge-Blocker für Phase 0)
+- **Gerätetests:** Ein iPhone und ein Android-Gerät müssen den Prototyp ausführen; ohne das bleiben alle Exportprofile auf „Sandbox“ und es gibt keine öffentliche Freigabe.
 
 ## Phasenplan
 
@@ -63,7 +66,7 @@ GPS-Aufzeichnung · Kartenlink-Import · Service-Worker-Update-Ablauf · Re-Rout
 | 6 Cloud/Admin | Auth, Sync, RLS, Admin, Kostenkontrolle | Nicht begonnen |
 
 ### Nächste konkrete Schritte
-1. CI (GitHub Actions: Typecheck + Unit-Tests; E2E mit Chrome for Testing).
+1. PMTiles-Detailkarte (R-01) und Routing-Free-Tier (R-03) gemäß Entscheidungen – Bedingungen belegen, dann umsetzen.
 2. E2E: Hintergrund-Abbruch, Service-Worker-Update.
 3. Streaming-Export (OPFS) gegen RAM-Grenze (R-06).
 4. Timeline-Editor mit Kamera-/Text-Keyframes (Ent. 13/14, Szenario 6).

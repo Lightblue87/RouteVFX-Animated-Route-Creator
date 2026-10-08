@@ -18,4 +18,4 @@ Stand: 2026-10-08. Status je Szenario: `PASS` · `FAIL` · `BLOCKED_EXTERNAL` ·
 | 11 | Projekte überleben Reload/Installation/Update | **OFFEN (Reload PASS Sandbox)** | E2E Reload + Integrationstest; Autosave schreibt ausstehende Änderungen beim Verlassen sofort (E2E). Installation und App-Update (Service-Worker-Wechsel) ungetestet; SW löscht nur `arc-shell-*`-Caches. |
 | 12 | DE/EN durchgängig, iPhone/Android gleichwertig | **OFFEN** | Wörterbücher typgeprüft vollständig; Geräte fehlen. |
 | 13 | Kein Apple-Material im Export, korrekte Attribution | **PASS (Sandbox)** | Kein Apple-Code vorhanden; Attribution im Video sichtbar (Frame-Prüfung). |
-| 14 | Backend/Admin | **DEFERRED** (Phase 6) | Kein Backend. Benötigt deine Freigabe als zurückgestellt. |
+| 14 | Backend/Admin | **DEFERRED_APPROVED** (Phase 6) | Kein Backend in V1 (Entscheidung 43). Vom Produktverantwortlichen am 2026-10-08 als auf Phase 6 zurückgestellt freigegeben. Szenario wird Pflicht, sobald Backend/Admin aktiviert wird. |
