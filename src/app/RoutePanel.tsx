@@ -132,7 +132,11 @@ export function RoutePanel({ api }: { api: ProjectApi }) {
     try {
       const r = await changeSegmentMode(project, segId, mode, settings);
       if (!r) return;
-      commit((cur) => replaceSegmentIfUnchanged(cur, r.base, r.segment));
+      commit((cur) => {
+        const next = replaceSegmentIfUnchanged(cur, r.base, r.segment);
+        // Die Übertragung hat stattgefunden, auch wenn das Ergebnis verworfen wird.
+        return r.usedOnline && !next.privacy.usedOnlineServices ? { ...next, privacy: { usedOnlineServices: true } } : next;
+      });
       setNotices(r.notices);
     } finally {
       setBusy(false);

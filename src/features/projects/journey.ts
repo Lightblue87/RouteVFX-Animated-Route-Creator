@@ -64,19 +64,21 @@ export function normalizeSegments(p: Project): Project {
 /** Berechnet fehlende Segmente. Modus: Vorgängersegment oder 'car'. Liefert Hinweise (Fallback-Gründe). */
 export async function fillMissingSegments(p: Project, settings: RoutingSettings, signal?: AbortSignal): Promise<{ project: Project; notices: string[] }> {
   const notices: string[] = [];
+  const usage = { online: false };
   let project = p;
   for (const { index, from, to } of missingPairs(p)) {
     const prevMode = project.journey.segments.find((s) => s.toStopId === from.id)?.mode;
     const mode: TransportMode = prevMode ?? (index === 0 ? 'car' : 'car');
-    const seg = await computeSegment(from, to, mode, settings, signal, notices);
+    const seg = await computeSegment(from, to, mode, settings, signal, notices, usage);
     project = { ...project, journey: { ...project.journey, segments: [...project.journey.segments, seg] } };
   }
-  if (settings.onlineAllowed && project !== p) project = { ...project, privacy: { usedOnlineServices: true } };
+  if (usage.online) project = { ...project, privacy: { usedOnlineServices: true } };
   return { project: normalizeSegments(project), notices };
 }
 
-export async function computeSegment(from: Stop, to: Stop, mode: TransportMode, settings: RoutingSettings, signal: AbortSignal | undefined, notices: string[]): Promise<RouteSegment> {
-  const { results, fallbackReason } = await routeSegment({ start: from.position, end: to.position, via: [], mode }, settings, signal);
+export async function computeSegment(from: Stop, to: Stop, mode: TransportMode, settings: RoutingSettings, signal: AbortSignal | undefined, notices: string[], usage?: { online: boolean }): Promise<RouteSegment> {
+  const { results, fallbackReason, usedOnline } = await routeSegment({ start: from.position, end: to.position, via: [], mode }, settings, signal);
+  if (usage && usedOnline) usage.online = true;
   if (fallbackReason) notices.push(fallbackReason);
   const seg = segmentFromResult(from, to, mode, results);
   if (fallbackReason) seg.warnings = [...seg.warnings, fallbackReason];
@@ -87,16 +89,17 @@ export async function computeSegment(from: Stop, to: Stop, mode: TransportMode, 
  * Berechnet einen Abschnitt mit neuem Verkehrsmittel. Gibt nur das neue Segment zurück; eingespielt wird es
  * über replaceSegmentIfUnchanged, damit eine langsame Routing-Antwort keine zwischenzeitlichen Änderungen überschreibt.
  */
-export async function changeSegmentMode(p: Project, segId: string, mode: TransportMode, settings: RoutingSettings): Promise<{ base: RouteSegment; segment: RouteSegment; notices: string[] } | null> {
+export async function changeSegmentMode(p: Project, segId: string, mode: TransportMode, settings: RoutingSettings): Promise<{ base: RouteSegment; segment: RouteSegment; notices: string[]; usedOnline: boolean } | null> {
   const old = p.journey.segments.find((s) => s.id === segId);
   if (!old) return null;
   const from = p.journey.stops.find((s) => s.id === old.fromStopId)!;
   const to = p.journey.stops.find((s) => s.id === old.toStopId)!;
   const notices: string[] = [];
-  const seg = await computeSegment(from, to, mode, settings, undefined, notices);
+  const usage = { online: false };
+  const seg = await computeSegment(from, to, mode, settings, undefined, notices, usage);
   seg.lineStyle = { ...defaultLineStyle(mode), widthPx: old.lineStyle.widthPx };
   seg.manualDurationMs = old.manualDurationMs;
-  return { base: old, segment: seg, notices };
+  return { base: old, segment: seg, notices, usedOnline: usage.online };
 }
 
 /**

@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { deleteProject, duplicateProject, getBlob, listProjects, loadProject, putBlob, saveProject, _resetDbHandle } from '../../src/adapters/storage/idb';
+import { deleteProject, duplicateProject, getBlob, pruneUnreferencedBlobs, listProjects, loadProject, putBlob, saveProject, _resetDbHandle } from '../../src/adapters/storage/idb';
 import { multimodalProject } from '../fixtures/project';
 import { openDB } from 'idb';
 
@@ -56,4 +56,19 @@ describe('IndexedDB storage', () => {
     expect(copied).toMatchObject({ name: 'm.mp3', type: 'audio/mpeg', size: 3 }); // Blob-Inhalt: fake-indexeddb/jsdom stellt Blob-Methoden nicht wieder her
     expect((await loadProject(copy.id))?.title).toBe('Kopie');
   });
+  it('prunes only unreferenced blobs of the given project', async () => {
+    const p = await multimodalProject();
+    const other = await multimodalProject();
+    const blob = (id: string, projectId: string) => putBlob({ id, projectId, name: 'm.mp3', type: 'audio/mpeg', size: 3, blob: new Blob(['abc']) });
+    await blob('keep', p.id);
+    await blob('old1', p.id);
+    await blob('old2', p.id);
+    await blob('foreign', other.id);
+    expect(await pruneUnreferencedBlobs(p.id, ['keep'])).toBe(2);
+    expect(await getBlob('keep')).toBeDefined();
+    expect(await getBlob('old1')).toBeUndefined();
+    expect(await getBlob('old2')).toBeUndefined();
+    expect(await getBlob('foreign')).toBeDefined();
+  });
 });
+

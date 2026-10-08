@@ -132,6 +132,23 @@ export async function duplicateProject(p: Project, title: string): Promise<Proje
   return copy;
 }
 
+/**
+ * Löscht Blobs eines Projekts, die nicht in `keep` stehen (z. B. entfernte oder ersetzte Audiodateien).
+ * Nur aufrufen, wenn keine Undo-Historie mehr auf ältere Blobs verweisen kann – etwa beim Öffnen eines Projekts.
+ */
+export async function pruneUnreferencedBlobs(projectId: string, keep: readonly string[]): Promise<number> {
+  const d = await db();
+  const tx = d.transaction('blobs', 'readwrite');
+  let removed = 0;
+  for (const key of await tx.store.index('projectId').getAllKeys(projectId)) {
+    if (keep.includes(String(key))) continue;
+    await tx.store.delete(key);
+    removed++;
+  }
+  await tx.done;
+  return removed;
+}
+
 export async function putBlob(b: StoredBlob): Promise<void> {
   try {
     await (await db()).put('blobs', b);

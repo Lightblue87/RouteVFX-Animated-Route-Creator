@@ -95,3 +95,17 @@ describe('Moduswechsel überschreibt keine späteren Änderungen', async () => {
     expect(next.journey.stops).toBe(cur.journey.stops);
   });
 });
+
+describe('Fade-Eingabe', async () => {
+  const { fadeMsFromSeconds, AudioSettingsSchema } = await import('../../src/core/project/schema');
+  it('clamps to the schema range and rejects non-numbers', () => {
+    expect(fadeMsFromSeconds(1.5)).toBe(1500);
+    expect(fadeMsFromSeconds(-3)).toBe(0);
+    expect(fadeMsFromSeconds(99)).toBe(20_000);
+    expect(fadeMsFromSeconds(Number.NaN)).toBe(0);
+    for (const v of [-3, 99, Number.NaN, 0.0004]) {
+      const ms = fadeMsFromSeconds(v);
+      expect(AudioSettingsSchema.safeParse({ assetId: 'a', fileName: 'f', gain: 1, fadeInMs: ms, fadeOutMs: ms, muted: false }).success).toBe(true);
+    }
+  });
+});

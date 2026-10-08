@@ -63,17 +63,46 @@ describe('routing provider contracts', () => {
     expect(fetchMock).not.toHaveBeenCalled();
     expect(r.results[0]!.confidence).toBe('estimated');
     expect(r.fallbackReason).toBe('online_routing_disabled');
+    expect(r.usedOnline).toBe(false);
   });
   it('registry falls back to labelled estimate on network failure', async () => {
     const online = createOsrmProvider('https://x', () => Promise.reject(new TypeError('Failed to fetch')));
     const r = await routeSegment({ start: HANNOVER, end: BARCELONA, via: [], mode: 'walk' }, { onlineAllowed: true, online });
     expect(r.results[0]!.confidence).toBe('estimated');
     expect(r.fallbackReason).toBe('network');
+    expect(r.usedOnline).toBe(true); // Anfrage wurde versucht – Punkte können übertragen worden sein
   });
   it('ship estimate carries land-collision warning; plane is derived', async () => {
     const ship = await routeSegment({ start: BARCELONA, end: PALMA, via: [], mode: 'ship' }, { onlineAllowed: true });
     expect(ship.results[0]!.warnings).toContain('ship_land_collision_unchecked');
     const plane = await routeSegment({ start: HANNOVER, end: BARCELONA, via: [], mode: 'plane' }, { onlineAllowed: false });
     expect(plane.results[0]!.confidence).toBe('derived');
+    expect(ship.usedOnline).toBe(false);
+    expect(plane.usedOnline).toBe(false);
+  });
+  it('privacy flag is set only when a network provider was actually called', async () => {
+    const { fillMissingSegments, changeSegmentMode } = await import('../../src/features/projects/journey');
+    const { multimodalProject } = await import('../fixtures/project');
+    const fetchMock = vi.fn(() => json(OSRM_OK));
+    const online = createOsrmProvider('https://x', fetchMock as unknown as typeof fetch);
+    const p = await multimodalProject();
+    // Fehlende Abschnitte erben „Auto“ → Online-Provider wird genutzt → Kennzeichnung
+    const local = { ...p, journey: { ...p.journey, segments: [p.journey.segments[0]!] } };
+    const filled = await fillMissingSegments(local, { onlineAllowed: true, online });
+    expect(filled.project.journey.segments.map((s) => s.mode)).toEqual(['car', 'car', 'car']);
+    expect(fetchMock).toHaveBeenCalled();
+    expect(filled.project.privacy.usedOnlineServices).toBe(true);
+    fetchMock.mockClear();
+    // Vorgänger ist Schiff → nur lokale Schätzung, trotz Opt-in keine Kennzeichnung
+    const shipOnly = { ...p, journey: { ...p.journey, segments: p.journey.segments.slice(0, 2) } };
+    const shipPrev = { ...shipOnly, journey: { ...shipOnly.journey, segments: [shipOnly.journey.segments[0]!, { ...shipOnly.journey.segments[1]!, mode: 'ship' as const }] } };
+    const filledLocal = await fillMissingSegments(shipPrev, { onlineAllowed: true, online });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(filledLocal.project.privacy.usedOnlineServices).toBe(false);
+    // Moduswechsel auf Auto mit Opt-in nutzt den Online-Provider und meldet es
+    const r = (await changeSegmentMode(p, p.journey.segments[2]!.id, 'car', { onlineAllowed: true, online }))!;
+    expect(r.usedOnline).toBe(true);
+    const r2 = (await changeSegmentMode(p, p.journey.segments[2]!.id, 'train', { onlineAllowed: true, online }))!;
+    expect(r2.usedOnline).toBe(false);
   });
 });

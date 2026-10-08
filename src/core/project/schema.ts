@@ -93,6 +93,13 @@ export type RouteSegment = z.infer<typeof RouteSegmentSchema>;
 export type LineStyle = z.infer<typeof LineStyleSchema>;
 export type AudioSettings = z.infer<typeof AudioSettingsSchema>;
 
+export const FADE_MAX_MS = 20_000;
+/** Eingabe in Sekunden → gültige Fade-Dauer in ms (Schema-Bereich), ungültige Eingaben → 0. */
+export function fadeMsFromSeconds(v: number): number {
+  if (!Number.isFinite(v)) return 0;
+  return Math.min(FADE_MAX_MS, Math.max(0, Math.round(v * 1000)));
+}
+
 /** Prüft Konsistenz über die reine Struktur hinaus (Segmente verbinden aufeinanderfolgende Stopps). */
 export function validateJourney(p: Project): string[] {
   const errors: string[] = [];

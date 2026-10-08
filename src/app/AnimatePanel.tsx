@@ -8,7 +8,7 @@ import { planTimeline } from '../core/timeline';
 import { putBlob } from '../adapters/storage/idb';
 import { newId } from '../core/project/factory';
 import { AUDIO_MAX_BYTES } from '../features/export/audio';
-import type { Project } from '../core/project/schema';
+import { fadeMsFromSeconds, type Project } from '../core/project/schema';
 
 export function AnimatePanel({ api }: { api: ProjectApi }) {
   const { t } = useI18n();
@@ -102,10 +102,10 @@ export function AnimatePanel({ api }: { api: ProjectApi }) {
                 <input type="range" min={0} max={2} step={0.05} value={project.audio.gain} onChange={(e) => set({ audio: { ...project.audio!, gain: Number(e.target.value) } })} />
               </label>
               <label className="field small">{t('anim.fadeIn')}
-                <input type="number" min={0} max={20} step={0.5} value={project.audio.fadeInMs / 1000} onChange={(e) => set({ audio: { ...project.audio!, fadeInMs: Math.round(Number(e.target.value) * 1000) } })} />
+                <input type="number" min={0} max={20} step={0.5} value={project.audio.fadeInMs / 1000} onChange={(e) => set({ audio: { ...project.audio!, fadeInMs: fadeMsFromSeconds(e.target.valueAsNumber) } })} />
               </label>
               <label className="field small">{t('anim.fadeOut')}
-                <input type="number" min={0} max={20} step={0.5} value={project.audio.fadeOutMs / 1000} onChange={(e) => set({ audio: { ...project.audio!, fadeOutMs: Math.round(Number(e.target.value) * 1000) } })} />
+                <input type="number" min={0} max={20} step={0.5} value={project.audio.fadeOutMs / 1000} onChange={(e) => set({ audio: { ...project.audio!, fadeOutMs: fadeMsFromSeconds(e.target.valueAsNumber) } })} />
               </label>
               <label className="toggle small"><input type="checkbox" checked={project.audio.muted} onChange={(e) => set({ audio: { ...project.audio!, muted: e.target.checked } })} />{t('anim.muted')}</label>
               <button className="btn small danger" onClick={() => set({ audio: undefined })}>{t('anim.audioRemove')}</button>

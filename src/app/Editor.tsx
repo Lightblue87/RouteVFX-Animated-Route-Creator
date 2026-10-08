@@ -1,7 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useI18n } from './App';
 import type { Project } from '../core/project/schema';
-import { loadProject, saveProject, StorageError } from '../adapters/storage/idb';
+import { loadProject, pruneUnreferencedBlobs, saveProject, StorageError } from '../adapters/storage/idb';
 import { RoutePanel } from './RoutePanel';
 import { AnimatePanel } from './AnimatePanel';
 const ExportPanel = lazy(() => import('./ExportPanel').then((m) => ({ default: m.ExportPanel })));
@@ -29,7 +29,12 @@ export function Editor({ projectId, close }: { projectId: string; close: () => v
 
   useEffect(() => {
     loadProject(projectId)
-      .then((p) => (p ? setProject(p) : setLoadError('not_found')))
+      .then((p) => {
+        if (!p) return setLoadError('not_found');
+        setProject(p);
+        // Beim Öffnen gibt es noch keine Undo-Historie: nicht mehr referenzierte Medien freigeben.
+        void pruneUnreferencedBlobs(p.id, p.audio ? [p.audio.assetId] : []).catch(() => undefined);
+      })
       .catch((e: Error) => setLoadError(e.message));
   }, [projectId]);
 
