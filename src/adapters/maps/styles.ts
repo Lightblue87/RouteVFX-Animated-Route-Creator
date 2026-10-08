@@ -1,6 +1,5 @@
 import type { LayerSpecification, StyleSpecification } from 'maplibre-gl';
-import { layers as protomapsLayers, namedFlavor } from '@protomaps/basemaps';
-import { basemapConfig } from './config';
+import { openFreeMapLayers, OPENFREEMAP } from './openfreemap';
 
 /**
  * Capability-Matrix je Kartenstil (CLAUDE.md §7). Nur Stile mit status 'verified' und exportAllowed
@@ -20,8 +19,8 @@ export interface MapStyleInfo {
   supports3d: boolean;
   status: 'verified' | 'unknown' | 'blocked';
   evidence: string;
-  /** Benötigt eine Betreiber-Konfiguration (z. B. PMTiles-URL); ohne sie ist der Stil nicht auswählbar. */
-  requires?: 'pmtiles';
+  /** Lädt Kartendaten von einem Drittanbieter (IP-Adresse + Kartenausschnitt werden übertragen). */
+  online?: boolean;
 }
 
 export const MAP_STYLES: MapStyleInfo[] = [
@@ -37,49 +36,37 @@ export const MAP_STYLES: MapStyleInfo[] = [
     attribution: 'Made with Natural Earth', attributionRequired: false, supports3d: false,
     status: 'verified', evidence: 'EXTERNAL_EVIDENCE.md#e04-natural-earth',
   },
-  // Detailkarte: OSM-Daten (ODbL) im Protomaps-Basemap-Schema, als PMTiles selbst gehostet (ADR-002, R-01).
-  // Export erlaubt mit sichtbarer Attribution im Video; Schriften OFL, Sprites MIT (public/basemap-assets).
+  // Detailkarte: OSM-Daten über die öffentliche OpenFreeMap-Instanz (kostenlos, ohne Schlüssel; ADR-002, R-01).
+  // Export erlaubt; OpenFreeMap verlangt für Video die Attribution unten (README „Attribution“).
   {
-    id: 'osm-light', category: 'standard', variant: 'light', provider: 'OpenStreetMap (PMTiles, selbst gehostet)',
+    id: 'ofm-positron', category: 'standard', variant: 'light', provider: 'OpenFreeMap (OpenStreetMap)',
     interactive: true, offlineCached: false, exportAllowed: true, allow4k: true,
-    attribution: '© OpenStreetMap contributors', attributionRequired: true, supports3d: false,
-    status: 'verified', evidence: 'EXTERNAL_EVIDENCE.md#e04-osm-pmtiles', requires: 'pmtiles',
+    attribution: OPENFREEMAP.attribution, attributionRequired: true, supports3d: false,
+    status: 'verified', evidence: 'EXTERNAL_EVIDENCE.md#e04-openfreemap', online: true,
   },
   {
-    id: 'osm-dark', category: 'standard', variant: 'dark', provider: 'OpenStreetMap (PMTiles, selbst gehostet)',
+    id: 'ofm-dark', category: 'standard', variant: 'dark', provider: 'OpenFreeMap (OpenStreetMap)',
     interactive: true, offlineCached: false, exportAllowed: true, allow4k: true,
-    attribution: '© OpenStreetMap contributors', attributionRequired: true, supports3d: false,
-    status: 'verified', evidence: 'EXTERNAL_EVIDENCE.md#e04-osm-pmtiles', requires: 'pmtiles',
+    attribution: OPENFREEMAP.attribution, attributionRequired: true, supports3d: false,
+    status: 'verified', evidence: 'EXTERNAL_EVIDENCE.md#e04-openfreemap', online: true,
   },
   // Weitere Kategorien (Satellit/Hybrid/3D-Gelände, Apple) sind gesperrt, bis E01–E04 geklärt sind.
 ];
 
-/** Ist der Stil in dieser Installation nutzbar (Konfiguration vorhanden)? */
-export function isStyleAvailable(s: MapStyleInfo): boolean {
-  return s.requires === 'pmtiles' ? basemapConfig().pmtilesUrl !== null : true;
-}
-
-/**
- * Stilinfo für eine Projekt-Referenz. Ist der Stil hier nicht verfügbar (z. B. keine PMTiles-URL), wird die
- * Natural-Earth-Variante gleicher Helligkeit geliefert – Vorschau, Export und Attribution bleiben konsistent.
- */
-export function getStyleInfo(id: string): MapStyleInfo {
-  const s = MAP_STYLES.find((x) => x.id === id) ?? MAP_STYLES[0]!;
-  if (isStyleAvailable(s)) return s;
-  return MAP_STYLES.find((x) => x.id === (s.variant === 'dark' ? 'ne-dark' : 'ne-light'))!;
-}
+export const getStyleInfo = (id: string): MapStyleInfo => MAP_STYLES.find((s) => s.id === id) ?? MAP_STYLES[0]!;
 
 const PALETTE = {
   'ne-light': { water: '#cfe3f2', land: '#f4f1ea', border: '#c9c2b4', lake: '#cfe3f2' },
   'ne-dark': { water: '#0d1b2a', land: '#1f2a36', border: '#3a4756', lake: '#0d1b2a' },
 } as const;
 
-function naturalEarthLayers(pal: { water: string; land: string; border: string; lake: string }): LayerSpecification[] {
+function naturalEarthLayers(pal: { water: string; land: string; border: string; lake: string }, maxzoom?: number): LayerSpecification[] {
+  const z = maxzoom === undefined ? {} : { maxzoom };
   return [
-    { id: 'water', type: 'background', paint: { 'background-color': pal.water } },
-    { id: 'land', type: 'fill', source: 'countries', paint: { 'fill-color': pal.land, 'fill-antialias': true } },
-    { id: 'lakes', type: 'fill', source: 'lakes', paint: { 'fill-color': pal.lake } },
-    { id: 'borders', type: 'line', source: 'countries', paint: { 'line-color': pal.border, 'line-width': ['interpolate', ['linear'], ['zoom'], 2, 0.4, 8, 1.2] } },
+    { id: 'water', type: 'background', paint: { 'background-color': pal.water }, ...z },
+    { id: 'land', type: 'fill', source: 'countries', paint: { 'fill-color': pal.land, 'fill-antialias': true }, ...z },
+    { id: 'lakes', type: 'fill', source: 'lakes', paint: { 'fill-color': pal.lake }, ...z },
+    { id: 'borders', type: 'line', source: 'countries', paint: { 'line-color': pal.border, 'line-width': ['interpolate', ['linear'], ['zoom'], 2, 0.4, 8, 1.2] }, ...z },
   ];
 }
 
@@ -92,24 +79,18 @@ export function buildStyle(id: string, baseUrl: string, lang: LabelLang = 'de'):
     countries: { type: 'geojson' as const, data: data('countries.json'), attribution: 'Made with Natural Earth' },
     lakes: { type: 'geojson' as const, data: data('lakes.json') },
   };
-  const url = basemapConfig().pmtilesUrl;
-  if (info.requires === 'pmtiles' && url) {
-    const flavor = namedFlavor(info.variant);
-    // Natural Earth liegt darunter: Ohne Netz (Kacheln fehlen) bleibt eine neutrale Land/Wasser-Karte sichtbar.
-    // Eigene Präfixe: Protomaps nutzt dieselben Layer-IDs (z. B. „water“), doppelte IDs machen den Stil ungültig.
-    const ne = naturalEarthLayers({ water: flavor.water, land: flavor.earth, border: flavor.boundaries, lake: flavor.water }).map((l) => ({ ...l, id: `ne-${l.id}` }));
-    // Glyphen/Sprites liegen gleich-originig (CSP, offline); Platzhalter {fontstack}/{range} dürfen nicht URL-kodiert werden.
-    const assets = new URL('basemap-assets/', baseUrl).toString();
-    const osm = (protomapsLayers('protomaps', flavor, { lang }) as LayerSpecification[]).filter((l) => l.type !== 'background');
+  if (info.id === 'ofm-positron' || info.id === 'ofm-dark') {
+    const ofm = openFreeMapLayers(info.id === 'ofm-dark' ? 'dark' : 'positron', lang);
+    // Natural Earth bis Zoom 7 unter den OpenFreeMap-Ebenen: ohne Netz bleibt eine Land/Wasser-Karte sichtbar.
+    // Darüber nicht, weil die groben Küstenlinien sonst neben den genauen OSM-Gewässern auffallen würden.
+    // Eigene ID-Präfixe vermeiden Kollisionen mit OpenFreeMap-Layern („water“).
+    const ne = naturalEarthLayers(ofm.palette, 7).map((l) => ({ ...l, id: `ne-${l.id}` }));
     return {
       version: 8,
-      glyphs: `${assets}fonts/{fontstack}/{range}.pbf`,
-      sprite: `${assets}sprites/v4/${info.variant}`,
-      sources: {
-        ...naturalEarth,
-        protomaps: { type: 'vector', url: `pmtiles://${new URL(url, baseUrl).toString()}`, attribution: '<a href="https://www.openstreetmap.org/copyright">© OpenStreetMap</a>' },
-      },
-      layers: [...ne, ...osm],
+      glyphs: OPENFREEMAP.glyphs,
+      sprite: OPENFREEMAP.sprite,
+      sources: { ...naturalEarth, openmaptiles: { type: 'vector', url: OPENFREEMAP.tilejson, attribution: OPENFREEMAP.attributionHtml } },
+      layers: [ofm.background, ...ne, ...ofm.layers],
     };
   }
   const pal = PALETTE[info.id as keyof typeof PALETTE] ?? PALETTE['ne-light'];

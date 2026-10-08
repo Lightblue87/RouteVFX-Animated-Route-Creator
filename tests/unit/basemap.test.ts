@@ -1,103 +1,53 @@
-import { afterEach, describe, expect, it } from 'vitest';
-import { existsSync, readFileSync } from 'node:fs';
+import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { PMTiles, type Source } from 'pmtiles';
 import { validateStyleMin } from '@maplibre/maplibre-gl-style-spec';
-import { _setBasemapConfig } from '../../src/adapters/maps/config';
-import { buildStyle, getStyleInfo, isStyleAvailable, MAP_STYLES } from '../../src/adapters/maps/styles';
-import { pmtilesOrigin } from '../../src/adapters/maps/pmtilesOrigin';
+import { buildStyle, getStyleInfo, MAP_STYLES } from '../../src/adapters/maps/styles';
+import { OPENFREEMAP } from '../../src/adapters/maps/openfreemap';
 
 const BASE = 'https://app.example/';
-const ASSETS = join(__dirname, '../../public/basemap-assets');
-const osm = (id: string) => MAP_STYLES.find((s) => s.id === id)!;
 
-afterEach(() => _setBasemapConfig({ pmtilesUrl: null }));
-
-describe('Detailkarte (PMTiles) – Verfügbarkeit', () => {
-  it('without a configured URL the OSM styles are unavailable and fall back to Natural Earth of the same variant', () => {
-    _setBasemapConfig({ pmtilesUrl: null });
-    expect(isStyleAvailable(osm('osm-light'))).toBe(false);
-    expect(getStyleInfo('osm-light').id).toBe('ne-light');
-    expect(getStyleInfo('osm-dark').id).toBe('ne-dark');
-    const style = buildStyle('osm-dark', BASE);
-    expect(Object.keys(style.sources)).not.toContain('protomaps');
-  });
-  it('with a URL the style uses pmtiles://, same-origin glyphs/sprites and keeps Natural Earth underneath', () => {
-    _setBasemapConfig({ pmtilesUrl: 'https://tiles.example.org/planet.pmtiles' });
-    expect(getStyleInfo('osm-light').id).toBe('osm-light');
-    const style = buildStyle('osm-light', BASE, 'de');
-    const src = style.sources.protomaps as { type: string; url: string; attribution: string };
-    expect(src).toMatchObject({ type: 'vector', url: 'pmtiles://https://tiles.example.org/planet.pmtiles' });
-    expect(src.attribution).toMatch(/OpenStreetMap/);
-    expect(style.glyphs).toBe('https://app.example/basemap-assets/fonts/{fontstack}/{range}.pbf');
-    expect(style.sprite).toBe('https://app.example/basemap-assets/sprites/v4/light');
-    expect(style.layers[0]!.id).toBe('ne-water');
-    expect(style.layers.filter((l) => l.type === 'background')).toHaveLength(1);
-    expect(style.layers.some((l) => 'source' in l && l.source === 'protomaps')).toBe(true);
-  });
-  it('generated styles pass MapLibre style validation (no duplicate layer ids etc.)', () => {
-    for (const url of [null, 'https://tiles.example.org/x.pmtiles']) {
-      _setBasemapConfig({ pmtilesUrl: url });
-      for (const s of MAP_STYLES) for (const lang of ['de', 'en'] as const) {
-        expect(validateStyleMin(buildStyle(s.id, BASE, lang) as never).map((e) => e.message), `${s.id}/${lang}/${url}`).toEqual([]);
-      }
+describe('Detailkarte (OpenFreeMap)', () => {
+  it('all generated styles pass MapLibre style validation (both label languages)', () => {
+    for (const s of MAP_STYLES) for (const lang of ['de', 'en'] as const) {
+      expect(validateStyleMin(buildStyle(s.id, BASE, lang) as never).map((e) => e.message), `${s.id}/${lang}`).toEqual([]);
     }
   });
-  it('relative URLs resolve against the app base', () => {
-    _setBasemapConfig({ pmtilesUrl: './tiles/region.pmtiles' });
-    const src = buildStyle('osm-light', 'https://app.example/sub/').sources.protomaps as { url: string };
-    expect(src.url).toBe('pmtiles://https://app.example/sub/tiles/region.pmtiles');
-  });
-  it('OSM styles require visible attribution in the video', () => {
-    for (const id of ['osm-light', 'osm-dark']) {
-      expect(osm(id)).toMatchObject({ exportAllowed: true, attributionRequired: true, attribution: '© OpenStreetMap contributors' });
+  it('uses the public OpenFreeMap endpoints and no unresolved placeholders or raster services', () => {
+    for (const id of ['ofm-positron', 'ofm-dark']) {
+      const style = buildStyle(id, BASE);
+      const json = JSON.stringify(style);
+      expect(json).not.toContain('__TILEJSON_DOMAIN__');
+      expect(style.sources.openmaptiles).toMatchObject({ type: 'vector', url: 'https://tiles.openfreemap.org/planet' });
+      expect(Object.values(style.sources).some((s) => s.type === 'raster')).toBe(false);
+      expect(style.glyphs).toBe('https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf');
+      expect(style.layers[0]!.type).toBe('background');
+      expect(style.layers.filter((l) => l.type === 'background')).toHaveLength(2); // OFM-Land + NE-Wasser (bis z7)
     }
   });
-});
-
-describe('Detailkarte – gebündelte Assets', () => {
-  it('every font stack and sprite used by the style is bundled (with licence files)', () => {
-    _setBasemapConfig({ pmtilesUrl: 'https://tiles.example.org/x.pmtiles' });
-    const fonts = new Set<string>();
-    const collect = (v: unknown): void => {
-      if (Array.isArray(v)) {
-        if (v.length && v.every((x) => typeof x === 'string') && v.some((x) => /^Noto /.test(x as string))) (v as string[]).forEach((f) => fonts.add(f));
-        else v.forEach(collect);
-      }
-    };
-    for (const variant of ['osm-light', 'osm-dark']) {
-      for (const l of buildStyle(variant, BASE).layers) collect((l.layout as Record<string, unknown> | undefined)?.['text-font']);
-      for (const suffix of ['.json', '.png', '@2x.json', '@2x.png']) expect(existsSync(join(ASSETS, `sprites/v4/${variant.slice(4)}${suffix}`))).toBe(true);
+  it('keeps Natural Earth underneath only up to zoom 7 (offline fallback without coarse coastlines at street level)', () => {
+    const ne = buildStyle('ofm-positron', BASE).layers.filter((l) => l.id.startsWith('ne-'));
+    expect(ne.map((l) => l.id)).toEqual(['ne-water', 'ne-land', 'ne-lakes', 'ne-borders']);
+    for (const l of ne) expect(l.maxzoom).toBe(7);
+  });
+  it('prefers labels in the project language', () => {
+    const style = buildStyle('ofm-positron', BASE, 'en');
+    const labels = style.layers.filter((l) => JSON.stringify((l.layout as Record<string, unknown> | undefined)?.['text-field'] ?? null).includes('"name'));
+    expect(labels.length).toBeGreaterThan(0);
+    for (const l of labels) expect(JSON.stringify((l.layout as Record<string, unknown>)['text-field'])).toMatch(/^\["coalesce",\["get","name:en"\]/);
+  });
+  it('declares the attribution OpenFreeMap requires for video and marks the style as online', () => {
+    expect(OPENFREEMAP.attribution).toBe('OpenFreeMap © OpenMapTiles Data from OpenStreetMap');
+    for (const id of ['ofm-positron', 'ofm-dark']) {
+      expect(getStyleInfo(id)).toMatchObject({ exportAllowed: true, attributionRequired: true, online: true, attribution: OPENFREEMAP.attribution });
     }
-    expect(fonts.size).toBeGreaterThan(0);
-    for (const f of fonts) expect(existsSync(join(ASSETS, 'fonts', f, '0-255.pbf')), f).toBe(true);
-    expect(readFileSync(join(ASSETS, 'fonts/OFL.txt'), 'utf8')).toMatch(/SIL Open Font License/);
-    expect(readFileSync(join(ASSETS, 'sprites/LICENSE-tangrams-icons.md'), 'utf8')).toMatch(/MIT License/);
+    expect(getStyleInfo('ne-light').online).toBeFalsy();
   });
-});
-
-describe('PMTiles-Testarchiv', () => {
-  it('fixture is a valid PMTiles v3 archive readable by the pmtiles library', async () => {
-    const buf = readFileSync(join(__dirname, '../fixtures/mini.pmtiles'));
-    const source: Source = {
-      getKey: () => 'mini',
-      getBytes: async (offset, length) => ({ data: buf.buffer.slice(buf.byteOffset + offset, buf.byteOffset + offset + length) as ArrayBuffer }),
-    };
-    const p = new PMTiles(source);
-    const h = await p.getHeader();
-    expect(h).toMatchObject({ specVersion: 3, tileType: 1, minZoom: 0, maxZoom: 8 });
-    const tile = await p.getZxy(6, 33, 21);
-    expect(tile?.data.byteLength).toBeGreaterThan(0);
+  it('production CSP allows the OpenFreeMap origin', () => {
+    const cfg = readFileSync(join(__dirname, '../../vite.config.ts'), 'utf8');
+    expect(cfg).toMatch(/connect-src[^"]*https:\/\/tiles\.openfreemap\.org/);
   });
-});
-
-describe('CSP-Origin der PMTiles-URL', () => {
-  it('derives https origins, ignores relative URLs, rejects insecure schemes', () => {
-    expect(pmtilesOrigin(undefined)).toBeNull();
-    expect(pmtilesOrigin('./tiles/x.pmtiles')).toBeNull();
-    expect(pmtilesOrigin('https://tiles.example.org/a/b.pmtiles')).toBe('https://tiles.example.org');
-    expect(pmtilesOrigin('http://localhost:8080/x.pmtiles')).toBe('http://localhost:8080');
-    expect(() => pmtilesOrigin('http://tiles.example.org/x.pmtiles')).toThrow();
-    expect(() => pmtilesOrigin('javascript:alert(1)')).toThrow();
+  it('ships the licence file of the bundled styles', () => {
+    expect(readFileSync(join(__dirname, '../../src/adapters/maps/openfreemap/LICENSE.md'), 'utf8')).toMatch(/CC BY 4\.0/);
   });
 });

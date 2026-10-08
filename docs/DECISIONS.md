@@ -25,18 +25,18 @@ Versionen exakt gepinnt (`package.json` ohne `^`, `package-lock.json`). TypeScri
 |---|---|---|---|
 | **MapLibre GL JS 6.13.0 + Natural Earth (lokal gebündelt) (gewählt für Prototyp)** | BSD-3-Clause; Daten gemeinfrei | Erlaubt (gemeinfrei), offline, 4K ohne Kachelserver | Verifiziert (Lizenz, Export in Sandbox) |
 | Apple MapKit JS | Apple Developer Program nötig (kostenpflichtig, Betrag nicht in dieser Sitzung geprüft); 250.000 Map-Views + 25.000 Service-Calls/Tag frei | **Unklar** – keine Erlaubnis für Video-Capture gefunden (E01) | Blockiert |
-| **MapLibre + OSM-Vektorkacheln als selbst gehostete PMTiles (gewählt 2026-10-08)** | ODbL-Daten mit Attribution; Stil BSD-3/CC0; Schriften OFL; Sprites MIT; Hosting-Kosten s. COST_MODEL | Erlaubt mit sichtbarer Attribution (E04-OSM) | **Implementiert**, mit synthetischem Testarchiv verifiziert (Sandbox); echter Build + Hosting offen |
-| MapLibre + OpenFreeMap | Bedingungen nicht abrufbar | nicht verifiziert | Nicht gewählt |
+| **MapLibre + OpenFreeMap (öffentliche Instanz) (gewählt 2026-10-08)** | kostenlos, ohne Schlüssel/Limits; OSM ODbL, Stile BSD-3/CC BY 4.0 | Erlaubt mit Pflicht-Attribution „OpenFreeMap © OpenMapTiles Data from OpenStreetMap“ (E04-OpenFreeMap) | **Implementiert**, mit simuliertem Dienst verifiziert (Sandbox) |
+| MapLibre + selbst gehostete OSM-PMTiles | Planet ≈ 120 GB > Freikontingente; R2 verlangt Zahlungsmethode | Erlaubt mit Attribution | Verworfen (Kosten), Code in Commit `844accc` |
 | tile.openstreetmap.org | OSMF-Richtlinie verbietet Bulk/Offline-Prefetch | Nicht als Exportfarm zulässig | Ausgeschlossen |
 
 Entscheidung: Renderer und Datenquelle sind getrennt (`src/adapters/maps/styles.ts` Capability-Matrix). Natural Earth liefert nur Länder, Küsten, Seen – für Straßen-/Stadt-Detail ist eine zweite, exportlizenzierte Quelle nötig (Risiko R-01).
 
-**Produktentscheidung 2026-10-08 (Produktverantwortlicher):** Detailkarte = **OSM-Vektorkacheln als selbst gehostete PMTiles-Datei** auf statischem Hosting, gerendert mit MapLibre. Begründung: keine Abhängigkeit von Dritt-Kachelservern, Offline-/Exportnutzung unter eigener Kontrolle, ODbL-Attribution im UI und Video. Status: **Implementiert** (2026-10-08), standardmäßig deaktiviert bis zur Hosting-Freigabe.
-- Umsetzung: `pmtiles://`-Protokoll in MapLibre (`src/adapters/maps/setup.ts`), Stile `osm-light`/`osm-dark` aus `@protomaps/basemaps` (Schema v4) in der Capability-Matrix (`styles.ts`), URL zur Build-Zeit über `VITE_PMTILES_URL` (`config.ts`, öffentlich, kein Geheimnis). Ohne URL sind die Stile in der Auswahl deaktiviert; Projekte mit OSM-Stil fallen sichtbar auf Natural Earth gleicher Helligkeit zurück (Hinweis im UI, Attribution konsistent).
-- Natural Earth liegt unter den OSM-Ebenen: ohne Netz bzw. ohne erreichbare Kacheldatei bleibt eine neutrale Land/Wasser-Karte mit Routenvektoren (CLAUDE.md §4).
-- Schriften/Sprites gleich-originig in `public/basemap-assets/` (CSP, offline), Service Worker cacht sie bei Nutzung, **keine Kacheln** (Range-Requests werden nie gecacht – kein Prefetch/Vorrat).
-- CSP: `connect-src` erhält den Origin der PMTiles-URL; nur `https` (bzw. localhost) erlaubt, sonst Build-Abbruch.
-- Offen: Hosting-Wahl und Datenausschnitt (Freigabe nötig, Kosten-/Kontofrage), Test mit echtem Protomaps-Build (Stil-Kompatibilität), Export-E2E mit OSM-Stil (H.264-Browser in dieser Sitzung nicht verfügbar).
+**Produktentscheidung 2026-10-08 (Produktverantwortlicher), revidiert am selben Tag:** Zuerst waren selbst gehostete PMTiles gewählt. Die Umsetzung zeigte, dass der Planet (≈ 120 GB) in kein Freikontingent ohne Zahlungsmethode passt, und der Betrieb muss kostenlos bleiben. Deshalb gilt jetzt: **Detailkarte = öffentliche OpenFreeMap-Instanz** (kostenlos, ohne Schlüssel, Video-Nutzung mit Attribution ausdrücklich geregelt).
+- Umsetzung: Stile `ofm-positron` (hell) und `ofm-dark` aus github.com/hyperknot/openfreemap-styles, lokal gebündelt (`src/adapters/maps/openfreemap/`, Lizenzdatei dabei); Kacheln, Glyphen und Sprites von `tiles.openfreemap.org`. Beschriftung bevorzugt in der Projektsprache (`name:de`/`name:en`). Schummerungs-Raster entfernt (zusätzlicher Dienst).
+- Standard bleibt Natural Earth (offline, ohne Datenübertragung). OpenFreeMap wird nur nach ausdrücklicher Auswahl geladen; die App weist auf die Übertragung von IP-Adresse und Kartenausschnitt hin und vermerkt sie im Projekt (`privacy.usedOnlineServices`).
+- Natural Earth liegt bis Zoom 7 unter den OpenFreeMap-Ebenen: ohne Netz bzw. bei Ausfall des Dienstes bleibt eine Land/Wasser-Karte; darüber eine neutrale Fläche mit Routenvektoren (CLAUDE.md §4).
+- CSP: `connect-src` und `img-src` um `https://tiles.openfreemap.org` erweitert. Keine Kachel-Vorratshaltung (Service Worker ignoriert Fremd-Origins).
+- Offen: Test gegen den echten Dienst, MP4-Export mit OpenFreeMap-Stil (H.264-Browser in dieser Sitzung nicht verfügbar), Gerätetests.
 
 ## ADR-003 Videoexport
 
@@ -98,7 +98,7 @@ Repository `RouteVFX-Animated-Route-Creator` mit Logo-Assets → App-Name „Rou
 | 07 | Möglichst reale Straßen/Bahn/Schiff | Blockiert (E05) | Straße nur mit Opt-in-OSRM (live ungetestet); Bahn/Schiff geschätzt + markiert. |
 | 08 | Stopps mit Pause/Zoom/Text/Wechsel | Teilweise verifiziert | Pause, Label, Moduswechsel-Overlay, Zoom am Stopp (Unit); Stopp-spezifische Texte über Label. |
 | 09 | Alternativrouten, Wegpunkte | Teilweise | Alternativauswahl (nur Mock-getestet); Wegpunkte im Modell, keine UI. |
-| 10 | Apple-Stile hell/dunkel/Satellit/Hybrid/3D/minimal | Teilweise (Apple blockiert E01–E04) | Natural Earth „minimal“ hell/dunkel; OSM-Standard hell/dunkel implementiert (PMTiles, Hosting offen). Satellit/Hybrid/3D gesperrt. |
+| 10 | Apple-Stile hell/dunkel/Satellit/Hybrid/3D/minimal | Teilweise (Apple blockiert E01–E04) | Natural Earth „minimal“ hell/dunkel; Standard hell/dunkel über OpenFreeMap implementiert. Satellit/Hybrid/3D gesperrt. |
 | 11 | Symbol / 2D / 3D-Fahrzeug | Teilweise | Eigene Vektor-Symbole; 2D-Upload und 3D nicht begonnen. |
 | 12 | Linie fortlaufend/vollständig/gestrichelt | Implementiert, teilweise verifiziert | Gestrichelt im Export sichtbar geprüft. |
 | 13 | Kamera-Presets + manuelle Keyframes | Teilweise | Übersicht, Folgen, Folgen+Fahrtrichtung, Auto-Zoom; Keyframes nicht begonnen. |

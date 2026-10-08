@@ -1,29 +1,29 @@
 /// <reference types="vitest/config" />
-import { defineConfig, loadEnv, type Plugin } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import react from '@vitejs/plugin-react';
-import { pmtilesOrigin } from './src/adapters/maps/pmtilesOrigin.ts';
 
 // Strikte CSP nur im Produktions-Build (Dev-Server benötigt Inline-Skripte für HMR).
-const buildCsp = (tilesOrigin: string | null) => [
+const CSP = [
   "default-src 'self'",
   "script-src 'self'",
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob:",
+  // tiles.openfreemap.org: Kacheln, Glyphen, Sprites der Detailkarte (nur wenn der Stil gewählt ist)
+  "img-src 'self' data: blob: https://tiles.openfreemap.org",
   "media-src 'self' blob:",
   "worker-src 'self' blob:",
-  `connect-src 'self' https://routing.openstreetmap.de https://nominatim.openstreetmap.org${tilesOrigin ? ` ${tilesOrigin}` : ''}`,
+  "connect-src 'self' https://routing.openstreetmap.de https://nominatim.openstreetmap.org https://tiles.openfreemap.org",
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'none'",
 ].join('; ');
 
-const cspPlugin = (csp: string): Plugin => ({
+const cspPlugin = (): Plugin => ({
   name: 'csp-meta',
   apply: 'build',
-  transformIndexHtml: (html) => html.replace('<meta charset="UTF-8" />', `<meta charset="UTF-8" />\n    <meta http-equiv="Content-Security-Policy" content="${csp}" />`),
+  transformIndexHtml: (html) => html.replace('<meta charset="UTF-8" />', `<meta charset="UTF-8" />\n    <meta http-equiv="Content-Security-Policy" content="${CSP}" />`),
 });
 
 // Trägt alle gehashten Bundles in den Precache des Service Workers ein (Offline-Start nach Erstinstallation).
@@ -49,13 +49,13 @@ const swPrecachePlugin = (): Plugin => {
   };
 };
 
-export default defineConfig(({ mode }) => ({
+export default defineConfig({
   base: './',
-  plugins: [react(), cspPlugin(buildCsp(pmtilesOrigin(loadEnv(mode, process.cwd(), 'VITE_').VITE_PMTILES_URL))), swPrecachePlugin()],
+  plugins: [react(), cspPlugin(), swPrecachePlugin()],
   build: { target: 'es2022', sourcemap: true, chunkSizeWarningLimit: 1500 },
   worker: { format: 'es' },
   test: {
     environment: 'jsdom',
     include: ['tests/unit/**/*.test.ts', 'tests/integration/**/*.test.ts', 'tests/contracts/**/*.test.ts'],
   },
-}));
+});

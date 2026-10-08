@@ -10,16 +10,13 @@
     "preview": "vite preview --port 4173 --strictPort",
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json && tsc -p tsconfig.node.json",
     "test": "vitest run",
-    "test:e2e": "VITE_PMTILES_URL=./test-tiles/mini.pmtiles vite build && playwright test",
-    "data:test-pmtiles": "node scripts/make-test-pmtiles.mjs tests/fixtures/mini.pmtiles",
+    "test:e2e": "playwright test",
     "data:build": "node scripts/build-geodata.mjs"
   },
   "dependencies": {
-    "@protomaps/basemaps": "5.7.2",
     "idb": "8.0.4",
     "maplibre-gl": "6.13.0",
     "mediabunny": "1.61.3",
-    "pmtiles": "4.5.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "zod": "4.6.5"
