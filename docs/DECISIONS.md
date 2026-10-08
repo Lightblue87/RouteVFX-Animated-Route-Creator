@@ -83,10 +83,10 @@ Repository `RouteVFX-Animated-Route-Creator` mit Logo-Assets → App-Name „Rou
 | 02 | Manuelle Planung zentral, GPS ergänzend | Teilweise verifiziert / GPS nicht begonnen | E2E: Ortssuche → Stopps → Segment. |
 | 03 | 9:16 für Story/Reels/TikTok/Shorts | Verifiziert (Sandbox) | ffprobe 1080×1920. |
 | 04 | Export wählt geeignete Methode | Teilweise implementiert | Capability-Probe je Profil + Vorschlag; nur eine Exportmethode (WebCodecs). |
-| 05 | Ortssuche, Tippen, Ziehen, GPX, Kartenlink | Teilweise | Ortssuche verifiziert; Tippen implementiert (ungetestet); GPX-Parser verifiziert (Unit), UI-Import ungetestet; Ziehen & Kartenlink nicht begonnen. |
+| 05 | Ortssuche, Tippen, Ziehen, GPX, Kartenlink | Teilweise | Ortssuche verifiziert; Tippen implementiert (ungetestet); GPX verifiziert (Unit + E2E); Linie ziehen verifiziert (E2E Sandbox); Kartenlink nicht begonnen. |
 | 06 | 8 Verkehrsmittel | Implementiert | Alle wählbar; Geometriequalität siehe 07. |
 | 07 | Möglichst reale Straßen/Bahn/Schiff | Blockiert (E05) | Straße nur mit Opt-in-OSRM (live ungetestet); Bahn/Schiff geschätzt + markiert. |
-| 08 | Stopps mit Pause/Zoom/Text/Wechsel | Teilweise | Pause, Label, Moduswechsel-Overlay implementiert; Zoom-je-Stopp nicht begonnen. |
+| 08 | Stopps mit Pause/Zoom/Text/Wechsel | Teilweise verifiziert | Pause, Label, Moduswechsel-Overlay, Zoom am Stopp (Unit); Stopp-spezifische Texte über Label. |
 | 09 | Alternativrouten, Wegpunkte | Teilweise | Alternativauswahl (nur Mock-getestet); Wegpunkte im Modell, keine UI. |
 | 10 | Apple-Stile hell/dunkel/Satellit/Hybrid/3D/minimal | Blockiert (E01–E04) | Nur Natural Earth „minimal“ hell/dunkel. |
 | 11 | Symbol / 2D / 3D-Fahrzeug | Teilweise | Eigene Vektor-Symbole; 2D-Upload und 3D nicht begonnen. |
@@ -99,7 +99,7 @@ Repository `RouteVFX-Animated-Route-Creator` mit Logo-Assets → App-Name „Rou
 | 18 | Übergänge, Effekte, Vorlagen | Nicht begonnen | |
 | 19 | FHD/4K, 30/60 FPS | Teilweise verifiziert | Siehe PERFORMANCE.md / RELEASE_MATRIX.md. |
 | 20 | Max. 3 Minuten | Verifiziert (Unit) | Schema lehnt > 180 s ab. |
-| 21 | Lokal ohne Konto | Implementiert, teilweise verifiziert | IndexedDB-Integrationstests. |
+| 21 | Lokal ohne Konto | Teilweise verifiziert | IndexedDB-Integrationstests + E2E Reload. |
 | 22 | Download, Share-Sheet; keine öffentlichen Links | Download verifiziert; Share implementiert, ungetestet (E13) | |
 | 23 | Konto E-Mail/Passwort | Nicht begonnen (Phase 6) | |
 | 24 | Kostenlos ohne Registrierung | Implementiert | Keine Kontofunktion vorhanden. |
@@ -119,7 +119,7 @@ Repository `RouteVFX-Animated-Route-Creator` mit Logo-Assets → App-Name „Rou
 | 38 | Budgets und Tests als Releasepflicht | Teilweise | PERFORMANCE.md (Entwurf), Tests vorhanden; Gerätetests offen. |
 | 39 | Apple Maps bevorzugt, Alternative zulässig | Alternative aktiv | Apple blockiert (E01/E03). |
 | 40 | Bei Überlastung niedrigere Qualität vorschlagen | Implementiert, teilweise | Vorschlag bei nicht unterstütztem Profil; Laufzeit-Überlastungserkennung fehlt. |
-| 41 | Näherung kennzeichnen + manuell korrigieren | Kennzeichnung verifiziert; Korrektur nicht begonnen | Badge, gestrichelte Linie, Export-Hinweis mit Bestätigung beim Ausblenden. |
+| 41 | Näherung kennzeichnen + manuell korrigieren | Teilweise verifiziert | Kennzeichnung (Badge, gestrichelt, Export-Hinweis mit Bestätigung); Linienbearbeitung per Ziehen (Unit + E2E Sandbox), Status wird `manually_edited`. |
 | 42 | Filmische vs. proportionale Zeit | Verifiziert (Unit) | |
 | 43 | Zunächst nur lokale Projekte | Implementiert | |
 | 44 | Phasen, Tests vor Start | Eingehalten | Keine Veröffentlichung. |

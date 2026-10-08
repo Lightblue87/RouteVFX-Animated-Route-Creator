@@ -51,3 +51,34 @@ describe('evaluateScene (deterministisch)', () => {
     expect(evaluateScene(model, 1000).vehicle).toBeNull();
   });
 });
+
+describe('Stopp-Zoom', () => {
+  it('zooms closer during the pause of a stop with zoomIn', async () => {
+    const p = await multimodalProject(30_000);
+    p.journey.stops[2]!.pauseMs = 3000;
+    const base = buildSceneModel(structuredClone(p));
+    p.journey.stops[2]!.zoomIn = true;
+    const zoomed = buildSceneModel(p);
+    const pause = zoomed.plan.phases.find((x) => x.kind === 'pause' && x.stopIndex === 2)!;
+    const mid = (pause.startMs + pause.endMs) / 2;
+    expect(evaluateScene(zoomed, mid).camera.zoom).toBeGreaterThan(evaluateScene(base, mid).camera.zoom + 0.5);
+  });
+});
+
+describe('Kamera-Übergang hält das Fahrzeug im Bild', () => {
+  it('vehicle stays inside the logical viewport during intro and outro', async () => {
+    const { mercatorX, mercatorY } = await import('../../src/core/geodesy');
+    const model = buildSceneModel(await multimodalProject(8_000));
+    for (let t = 0; t <= 8_000; t += 40) {
+      const s = evaluateScene(model, t);
+      const sc = 512 * 2 ** s.camera.zoom;
+      // Bearing ignoriert (Preset 'follow' → 0)
+      const x = (mercatorX(s.vehicle!.position.lon) - mercatorX(s.camera.center.lon)) * sc + 270;
+      const y = (mercatorY(s.vehicle!.position.lat) - mercatorY(s.camera.center.lat)) * sc + 480;
+      expect(x).toBeGreaterThan(0);
+      expect(x).toBeLessThan(540);
+      expect(y).toBeGreaterThan(0);
+      expect(y).toBeLessThan(960);
+    }
+  });
+});

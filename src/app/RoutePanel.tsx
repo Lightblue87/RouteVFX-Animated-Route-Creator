@@ -5,7 +5,7 @@ import { PlannerMap } from './PlannerMap';
 import { loadAirports, loadPlaces, searchNominatim, searchOffline, type Place } from '../adapters/geocoding';
 import { createOsrmProvider } from '../adapters/routing/osrm';
 import type { RoutingSettings } from '../adapters/routing/registry';
-import { addStop, appendGpxTrack, changeSegmentMode, fillMissingSegments, missingPairs, moveStop, normalizeSegments, removeStop, updateSegment, updateStop } from '../features/projects/journey';
+import { addStop, applyControlPoints, appendGpxTrack, controlPointsOf, changeSegmentMode, fillMissingSegments, missingPairs, moveStop, normalizeSegments, removeStop, updateSegment, updateStop } from '../features/projects/journey';
 import { GPX_MAX_BYTES, GpxError, parseGpx } from '../features/imports/gpx';
 import { TRANSPORT_MODES, type GeoPoint, type TransportMode } from '../core/types';
 import { formatKm, type MessageKey } from '../i18n';
@@ -34,6 +34,15 @@ export function RoutePanel({ api }: { api: ProjectApi }) {
   const [online, setOnline] = useOnlineSetting();
   const settings: RoutingSettings = useMemo(() => ({ onlineAllowed: online, online: osrm }), [online]);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [editId, setEditId] = useState<string | null>(null);
+  const editSeg = project.journey.segments.find((s) => s.id === editId) ?? null;
+  const edit = editSeg
+    ? {
+        segmentId: editSeg.id,
+        points: controlPointsOf(editSeg),
+        onChange: (pts: GeoPoint[]) => commit((p) => ({ ...p, modifiedAt: new Date().toISOString(), journey: { ...p.journey, segments: p.journey.segments.map((s) => (s.id === editSeg.id ? applyControlPoints(s, pts) : s)) } })),
+      }
+    : null;
 
   // Offline-Suche (lokal, ohne Netz) mit leichtem Debounce
   useEffect(() => {
@@ -133,7 +142,13 @@ export function RoutePanel({ api }: { api: ProjectApi }) {
 
   return (
     <div className="panel route-panel">
-      <PlannerMap project={project} onTap={(p) => add(p, `${p.lat.toFixed(3)}, ${p.lon.toFixed(3)}`)} />
+      <PlannerMap project={project} edit={edit} onTap={(p) => add(p, `${p.lat.toFixed(3)}, ${p.lon.toFixed(3)}`)} />
+      {edit && (
+        <div className="card row edit-bar" role="status">
+          <span className="grow small">{t('route.editHint')}</span>
+          <button className="btn primary small" onClick={() => setEditId(null)} data-testid="edit-done">{t('route.editDone')}</button>
+        </div>
+      )}
       <div className="sheet">
         <label className="search">
           <span className="sr-only">{t('route.search')}</span>
@@ -186,6 +201,15 @@ export function RoutePanel({ api }: { api: ProjectApi }) {
                   <button className="btn ghost icon" onClick={() => commit((p) => moveStop(p, i, 1))} disabled={i === project.journey.stops.length - 1} aria-label={t('route.down')}>↓</button>
                   <button className="btn ghost icon danger" onClick={() => commit((p) => removeStop(p, s.id))} aria-label={t('route.remove')}>✕</button>
                 </div>
+                {i > 0 && i < project.journey.stops.length - 1 && (
+                  <div className="row wrap stop-opts">
+                    <label className="small">{t('route.pauseS')}
+                      <input type="number" min={0} max={10} step={0.5} value={s.pauseMs / 1000}
+                        onChange={(e) => commit((p) => updateStop(p, s.id, { pauseMs: Math.max(0, Math.min(10_000, Math.round(Number(e.target.value) * 1000))) }))} />
+                    </label>
+                    <label className="toggle small"><input type="checkbox" checked={s.zoomIn} onChange={(e) => commit((p) => updateStop(p, s.id, { zoomIn: e.target.checked }))} />{t('route.zoomIn')}</label>
+                  </div>
+                )}
                 {seg && (
                   <div className={`segment conf-${seg.confidence}`} data-testid="segment">
                     <select value={seg.mode} onChange={(e) => setMode(seg.id, e.target.value as TransportMode)} aria-label={t('route.segment', { n: i + 1 })} data-testid="segment-mode">
@@ -204,6 +228,9 @@ export function RoutePanel({ api }: { api: ProjectApi }) {
                       </select>
                     )}
                     {seg.warnings.filter((w) => !w.startsWith('online') ).map((w) => <p key={w} className="small warn">{t(`warn.${w}` as MessageKey)}</p>)}
+                    <button className="btn small" onClick={() => setEditId(editId === seg.id ? null : seg.id)} aria-pressed={editId === seg.id} data-testid="segment-edit">
+                      {t('route.editLine')}
+                    </button>
                     {seg.attribution && <p className="small muted">{seg.attribution}</p>}
                   </div>
                 )}

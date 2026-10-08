@@ -111,7 +111,11 @@ function followTarget(model: SceneModel, tMs: number): CameraState {
   const s = model.segments[segmentIndex]!;
   const { point, headingDeg } = alongLine(s.index, fraction * s.index.totalM);
   const rotate = model.project.cameraPreset === 'follow-rotate';
-  return { center: point, zoom: model.segmentZoom[segmentIndex]!, bearing: rotate ? headingDeg : 0, pitch: rotate ? 35 : 0 };
+  let zoom = model.segmentZoom[segmentIndex]!;
+  // Stopp mit „Zoom“: während der Pause näher heran (Glättung erfolgt über smoothedFollow)
+  const phase = phaseAt(model.plan, tMs);
+  if (phase.kind === 'pause' && model.project.journey.stops[phase.stopIndex]?.zoomIn) zoom = Math.min(13, zoom + 2);
+  return { center: point, zoom, bearing: rotate ? headingDeg : 0, pitch: rotate ? 35 : 0 };
 }
 
 /** Zeitlich geglättete Kamera: Mittel über ein symmetrisches Fenster – deterministisch, ohne Zustand. */
@@ -146,6 +150,23 @@ function lerpCamera(a: CameraState, b: CameraState, f: number): CameraState {
   };
 }
 
+/**
+ * Übergang Übersicht ↔ Folgekamera, bei dem das Ziel (Fahrzeug) im Bild bleibt:
+ * Seine Bildschirmposition wandert linear von der Übersichtsposition zur Bildmitte,
+ * statt Zentrum und Zoom unabhängig zu interpolieren (sonst verlässt es zwischendurch das Bild).
+ */
+function blendKeepTarget(overview: CameraState, follow: CameraState, f: number): CameraState {
+  const scale = (z: number) => 512 * 2 ** z;
+  const zoom = overview.zoom + (follow.zoom - overview.zoom) * f;
+  const ox = mercatorX(overview.center.lon), oy = mercatorY(overview.center.lat);
+  const tx = mercatorX(follow.center.lon), ty = mercatorY(follow.center.lat);
+  const s0 = scale(overview.zoom), sf = scale(zoom);
+  const dx = (tx - ox) * s0 * (1 - f), dy = (ty - oy) * s0 * (1 - f); // Bildschirmversatz in px
+  const cx = tx - dx / sf, cy = ty - dy / sf;
+  const b = lerpCamera(overview, follow, f);
+  return { center: { lat: latFromMercatorY(cy), lon: lonFromMercatorX(cx) }, zoom, bearing: b.bearing, pitch: b.pitch };
+}
+
 function cameraAt(model: SceneModel, tMs: number): CameraState {
   if (model.segments.length === 0 || model.project.cameraPreset === 'overview') return model.overview;
   const { phases, totalMs } = model.plan;
@@ -154,8 +175,8 @@ function cameraAt(model: SceneModel, tMs: number): CameraState {
   const follow = smoothedFollow(model, tMs);
   // Weicher Übergang Übersicht → Folgekamera (Intro + erste Bewegungssekunde) und zurück (Outro).
   const inEnd = intro.endMs + Math.min(1500, totalMs * 0.1);
-  if (tMs < inEnd) return lerpCamera(model.overview, follow, ease('easeInOut', tMs / Math.max(1, inEnd)));
-  if (tMs > outro.startMs) return lerpCamera(follow, model.overview, ease('easeInOut', (tMs - outro.startMs) / Math.max(1, outro.endMs - outro.startMs)));
+  if (tMs < inEnd) return blendKeepTarget(model.overview, follow, ease('easeInOut', tMs / Math.max(1, inEnd)));
+  if (tMs > outro.startMs) return blendKeepTarget(model.overview, follow, 1 - ease('easeInOut', (tMs - outro.startMs) / Math.max(1, outro.endMs - outro.startMs)));
   return follow;
 }
 

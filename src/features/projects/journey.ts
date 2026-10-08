@@ -4,7 +4,7 @@ import type { GeoPoint, TransportMode } from '../../core/types';
 import { routeSegment, type RoutingSettings } from '../../adapters/routing/registry';
 import type { GpxTrack } from '../imports/gpx';
 import { simplify } from '../imports/gpx';
-import { lineLengthM } from '../../core/geodesy';
+import { greatCircle, lineLengthM, normalizeLon, unwrapLongitudes } from '../../core/geodesy';
 
 /** Reine Mutationen am Projekt (für Undo/Redo). Segmente werden über (fromStopId,toStopId) zugeordnet. */
 const touch = (p: Project): Project => ({ ...p, modifiedAt: new Date().toISOString() });
@@ -31,7 +31,7 @@ export function moveStop(p: Project, index: number, delta: -1 | 1): Project {
   return touch({ ...p, journey: { ...p.journey, stops } });
 }
 
-export function updateStop(p: Project, stopId: string, patch: Partial<Pick<Stop, 'label' | 'pauseMs' | 'showLabel'>>): Project {
+export function updateStop(p: Project, stopId: string, patch: Partial<Pick<Stop, 'label' | 'pauseMs' | 'showLabel' | 'zoomIn'>>): Project {
   return touch({ ...p, journey: { ...p.journey, stops: p.journey.stops.map((s) => (s.id === stopId ? { ...s, ...patch } : s)) } });
 }
 
@@ -125,4 +125,47 @@ export function appendGpxTrack(p: Project, track: GpxTrack, mode: TransportMode 
     warnings: [],
   };
   return touch({ ...p, journey: { stops, segments: [...p.journey.segments, seg] } });
+}
+
+// ---------------------------------------------------------------------------
+// Manuelle Geometriebearbeitung (anbieterunabhängig): Kontrollpunkte → verdichtete Großkreis-Polylinie.
+
+const MAX_CONTROL_POINTS = 16;
+
+/** Kontrollpunkte zum Bearbeiten: gespeicherte Formpunkte oder vereinfachte Geometrie (≤ 16 Punkte). */
+export function controlPointsOf(seg: RouteSegment): GeoPoint[] {
+  if (seg.confidence === 'manually_edited' && seg.via.length >= 2) return seg.via.map((p) => ({ lat: p.lat, lon: p.lon }));
+  const g = seg.alternatives[seg.selectedAlternative]?.geometry ?? seg.geometry;
+  let tol = 0.0005;
+  let pts = simplify(g, tol);
+  while (pts.length > MAX_CONTROL_POINTS && tol < 10) {
+    tol *= 2;
+    pts = simplify(g, tol);
+  }
+  return pts.map((p) => ({ lat: p.lat, lon: p.lon }));
+}
+
+/** Erzeugt aus Kontrollpunkten eine neue Geometrie; Distanz wird neu berechnet, Herkunft als manuell markiert. */
+export function applyControlPoints(seg: RouteSegment, control: GeoPoint[]): RouteSegment {
+  if (control.length < 2) throw new Error('need at least two control points');
+  const geometry: GeoPoint[] = [];
+  for (let i = 1; i < control.length; i++) {
+    const a = control[i - 1]!, b = control[i]!;
+    const n = Math.max(2, Math.min(64, Math.round(lineLengthM([a, b]) / 5_000)));
+    const part = greatCircle(a, b, n).map((p) => ({ lat: p.lat, lon: normalizeLon(p.lon) }));
+    geometry.push(...(i === 1 ? part : part.slice(1)));
+  }
+  return {
+    ...seg,
+    via: control,
+    geometry,
+    geometryVersion: seg.geometryVersion + 1,
+    source: 'manual',
+    confidence: 'manually_edited',
+    distanceM: lineLengthM(unwrapLongitudes(geometry)),
+    etaS: undefined, // Anbieter-Fahrzeit gilt für bearbeitete Geometrie nicht mehr
+    alternatives: [],
+    selectedAlternative: 0,
+    warnings: seg.warnings.filter((w) => w !== 'estimated_geometry'),
+  };
 }

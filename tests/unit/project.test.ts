@@ -40,3 +40,34 @@ describe('project model', () => {
     expect(() => migrateAndValidate(p)).not.toThrow();
   });
 });
+
+describe('manuelle Geometriekorrektur', async () => {
+  const { applyControlPoints, controlPointsOf } = await import('../../src/features/projects/journey');
+  it('control points are few and keep endpoints', async () => {
+    const p = await multimodalProject();
+    const seg = p.journey.segments[2]!; // Schiff, geschätzt
+    const cp = controlPointsOf(seg);
+    expect(cp.length).toBeGreaterThanOrEqual(2);
+    expect(cp.length).toBeLessThanOrEqual(16);
+    expect(cp[0]).toEqual({ lat: seg.geometry[0]!.lat, lon: seg.geometry[0]!.lon });
+  });
+  it('moving a control point changes geometry, distance and provenance', async () => {
+    const p = await multimodalProject();
+    const seg = p.journey.segments[2]!;
+    const cp = controlPointsOf(seg);
+    const detour = [cp[0]!, { lat: 40.6, lon: 3.6 }, cp[cp.length - 1]!]; // Bogen östlich um Mallorca-Nordspitze
+    const edited = applyControlPoints(seg, detour);
+    expect(edited.confidence).toBe('manually_edited');
+    expect(edited.source).toBe('manual');
+    expect(edited.distanceM).toBeGreaterThan(seg.distanceM);
+    expect(edited.geometryVersion).toBe(seg.geometryVersion + 1);
+    expect(edited.etaS).toBeUndefined();
+    expect(controlPointsOf(edited)).toEqual(detour);
+    expect(() => migrateAndValidate({ ...p, journey: { ...p.journey, segments: [p.journey.segments[0], p.journey.segments[1], edited] } })).not.toThrow();
+  });
+  it('antimeridian edits stay continuous', async () => {
+    const p = await multimodalProject();
+    const edited = applyControlPoints(p.journey.segments[1]!, [{ lat: 35, lon: 170 }, { lat: 40, lon: -170 }]);
+    expect(edited.distanceM / 1000).toBeLessThan(2500);
+  });
+});

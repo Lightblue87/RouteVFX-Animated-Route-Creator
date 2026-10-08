@@ -42,8 +42,8 @@ export function drawOverlay(ctx: CanvasRenderingContext2D, state: SceneState, pr
   }
 
   // Stopps
-  for (const s of state.stops) {
-    const p = project(s.position);
+  const projected = state.stops.map((s) => ({ s, p: project(s.position) }));
+  for (const { s, p } of projected) {
     ctx.beginPath();
     ctx.arc(p.x, p.y, s.reached ? 7 : 5, 0, Math.PI * 2);
     ctx.fillStyle = s.reached ? '#ffffff' : 'rgba(255,255,255,0.6)';
@@ -51,7 +51,23 @@ export function drawOverlay(ctx: CanvasRenderingContext2D, state: SceneState, pr
     ctx.lineWidth = 3;
     ctx.strokeStyle = '#1c1c1e';
     ctx.stroke();
-    if (o.overlays.showStopLabels && s.label && s.reached) pill(ctx, s.label, p.x, p.y - 22, 15, s.isActive ? 1 : 0.85, o.dark);
+  }
+  // Labels mit einfacher Kollisionsvermeidung: aktiver Stopp, dann Start/Ziel, dann übrige; überlappende werden ausgelassen.
+  if (o.overlays.showStopLabels) {
+    const n = projected.length;
+    const order = projected
+      .map((x, i) => ({ ...x, prio: x.s.isActive ? 0 : i === 0 || i === n - 1 ? 1 : 2, i }))
+      .filter((x) => x.s.label && x.s.reached)
+      .sort((a, b) => a.prio - b.prio || a.i - b.i);
+    const placed: { x0: number; y0: number; x1: number; y1: number }[] = [];
+    ctx.font = `600 15px ${FONT}`;
+    for (const { s, p } of order) {
+      const w = Math.min(ctx.measureText(s.label).width, 440) + 21;
+      const box = { x0: p.x - w / 2, y0: p.y - 22 - 15, x1: p.x + w / 2, y1: p.y - 22 + 15 };
+      if (placed.some((b) => box.x0 < b.x1 && box.x1 > b.x0 && box.y0 < b.y1 && box.y1 > b.y0)) continue;
+      placed.push(box);
+      pill(ctx, s.label, p.x, p.y - 22, 15, s.isActive ? 1 : 0.85, o.dark);
+    }
   }
 
   // Fahrzeug
