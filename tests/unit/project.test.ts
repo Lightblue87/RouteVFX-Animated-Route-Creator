@@ -71,3 +71,27 @@ describe('manuelle Geometriekorrektur', async () => {
     expect(edited.distanceM / 1000).toBeLessThan(2500);
   });
 });
+
+describe('Moduswechsel überschreibt keine späteren Änderungen', async () => {
+  const { applyControlPoints, changeSegmentMode, controlPointsOf, replaceSegmentIfUnchanged } = await import('../../src/features/projects/journey');
+  it('applies the new segment when nothing changed meanwhile', async () => {
+    const p = await multimodalProject();
+    const r = (await changeSegmentMode(p, p.journey.segments[2]!.id, 'train', { onlineAllowed: false }))!;
+    const next = replaceSegmentIfUnchanged(p, r.base, r.segment);
+    expect(next.journey.segments[2]!.mode).toBe('train');
+  });
+  it('drops a stale routing result if the segment was edited in the meantime', async () => {
+    const p = await multimodalProject();
+    const seg = p.journey.segments[2]!;
+    const pending = changeSegmentMode(p, seg.id, 'train', { onlineAllowed: false });
+    // Nutzer bearbeitet die Linie, bevor das Routing antwortet
+    const cp = controlPointsOf(seg);
+    const edited = applyControlPoints(seg, [cp[0]!, { lat: 40.6, lon: 3.6 }, cp[cp.length - 1]!]);
+    const cur = { ...p, journey: { ...p.journey, segments: [p.journey.segments[0]!, p.journey.segments[1]!, edited] } };
+    const r = (await pending)!;
+    const next = replaceSegmentIfUnchanged(cur, r.base, r.segment);
+    expect(next).toBe(cur);
+    expect(next.journey.segments[2]!.confidence).toBe('manually_edited');
+    expect(next.journey.stops).toBe(cur.journey.stops);
+  });
+});

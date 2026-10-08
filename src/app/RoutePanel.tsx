@@ -5,7 +5,7 @@ import { PlannerMap } from './PlannerMap';
 import { loadAirports, loadPlaces, searchNominatim, searchOffline, type Place } from '../adapters/geocoding';
 import { createOsrmProvider } from '../adapters/routing/osrm';
 import type { RoutingSettings } from '../adapters/routing/registry';
-import { addStop, applyControlPoints, appendGpxTrack, controlPointsOf, changeSegmentMode, fillMissingSegments, missingPairs, moveStop, normalizeSegments, removeStop, updateSegment, updateStop } from '../features/projects/journey';
+import { addStop, applyControlPoints, appendGpxTrack, controlPointsOf, changeSegmentMode, fillMissingSegments, missingPairs, moveStop, normalizeSegments, replaceSegmentIfUnchanged, removeStop, updateSegment, updateStop } from '../features/projects/journey';
 import { GPX_MAX_BYTES, GpxError, parseGpx } from '../features/imports/gpx';
 import { TRANSPORT_MODES, type GeoPoint, type TransportMode } from '../core/types';
 import { formatKm, type MessageKey } from '../i18n';
@@ -130,9 +130,10 @@ export function RoutePanel({ api }: { api: ProjectApi }) {
   const setMode = async (segId: string, mode: TransportMode) => {
     setBusy(true);
     try {
-      const { project: p, notices: n } = await changeSegmentMode(project, segId, mode, settings);
-      commit(p);
-      setNotices(n);
+      const r = await changeSegmentMode(project, segId, mode, settings);
+      if (!r) return;
+      commit((cur) => replaceSegmentIfUnchanged(cur, r.base, r.segment));
+      setNotices(r.notices);
     } finally {
       setBusy(false);
     }
@@ -228,7 +229,7 @@ export function RoutePanel({ api }: { api: ProjectApi }) {
                       </select>
                     )}
                     {seg.warnings.filter((w) => !w.startsWith('online') ).map((w) => <p key={w} className="small warn">{t(`warn.${w}` as MessageKey)}</p>)}
-                    <button className="btn small" onClick={() => setEditId(editId === seg.id ? null : seg.id)} aria-pressed={editId === seg.id} data-testid="segment-edit">
+                    <button className="btn small" onClick={() => setEditId(editId === seg.id ? null : seg.id)} aria-pressed={editId === seg.id} disabled={busy} data-testid="segment-edit">
                       {t('route.editLine')}
                     </button>
                     {seg.attribution && <p className="small muted">{seg.attribution}</p>}

@@ -61,6 +61,7 @@ test('Szenario 2: multimodal Hannover → HAJ → Barcelona → Palma als MP4', 
   await page.getByTestId('segment-mode').nth(1).selectOption('plane');
   await expect(page.getByTestId('segment-confidence').nth(1)).toHaveText(/Großkreis|great circle/i);
   await page.getByTestId('segment-mode').nth(2).selectOption('ship');
+  await expect(page.getByTestId('segment-mode').nth(2)).toHaveValue('ship');
   await expect(page.getByTestId('segment-confidence').nth(2)).toHaveText(/Geschätzt|Estimated/);
   await page.getByTestId('tab-animate').click();
   await page.getByTestId('title-input').fill('Hannover → Palma');
@@ -88,9 +89,13 @@ test('Szenario 3 (Teil): geschätzte Schiffsroute per Ziehen korrigieren, Distan
   await addPlace(page, 'Palma', /Palma/);
   await expect(page.getByTestId('segment')).toHaveCount(1);
   await page.getByTestId('segment-mode').selectOption('ship');
+  // Moduswechsel ist asynchron: warten, bis der Schiffsabschnitt tatsächlich übernommen ist
+  await expect(page.getByTestId('segment-mode')).toHaveValue('ship');
   await expect(page.getByTestId('segment-confidence')).toHaveText(/Geschätzt|Estimated/);
   const before = await page.getByTestId('segment').locator('span.small').first().textContent();
   await page.getByTestId('segment-edit').click();
+  // erst ziehen, wenn die Karte geladen und auf die Route eingepasst ist
+  await expect(page.getByTestId('planner-map')).toHaveAttribute('aria-busy', 'false');
   const box = (await page.getByTestId('planner-map').boundingBox())!;
   const cx = box.x + box.width / 2, cy = box.y + box.height / 2;
   await page.mouse.move(cx, cy);

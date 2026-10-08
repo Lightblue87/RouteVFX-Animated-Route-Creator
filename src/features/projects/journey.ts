@@ -83,16 +83,29 @@ export async function computeSegment(from: Stop, to: Stop, mode: TransportMode, 
   return seg;
 }
 
-export async function changeSegmentMode(p: Project, segId: string, mode: TransportMode, settings: RoutingSettings): Promise<{ project: Project; notices: string[] }> {
+/**
+ * Berechnet einen Abschnitt mit neuem Verkehrsmittel. Gibt nur das neue Segment zurück; eingespielt wird es
+ * über replaceSegmentIfUnchanged, damit eine langsame Routing-Antwort keine zwischenzeitlichen Änderungen überschreibt.
+ */
+export async function changeSegmentMode(p: Project, segId: string, mode: TransportMode, settings: RoutingSettings): Promise<{ base: RouteSegment; segment: RouteSegment; notices: string[] } | null> {
   const old = p.journey.segments.find((s) => s.id === segId);
-  if (!old) return { project: p, notices: [] };
+  if (!old) return null;
   const from = p.journey.stops.find((s) => s.id === old.fromStopId)!;
   const to = p.journey.stops.find((s) => s.id === old.toStopId)!;
   const notices: string[] = [];
   const seg = await computeSegment(from, to, mode, settings, undefined, notices);
   seg.lineStyle = { ...defaultLineStyle(mode), widthPx: old.lineStyle.widthPx };
   seg.manualDurationMs = old.manualDurationMs;
-  return { project: touch({ ...p, journey: { ...p.journey, segments: p.journey.segments.map((s) => (s.id === segId ? seg : s)) } }), notices };
+  return { base: old, segment: seg, notices };
+}
+
+/**
+ * Ersetzt `base` durch `next`, aber nur wenn `base` im aktuellen Projekt noch unverändert ist.
+ * Wurde der Abschnitt inzwischen bearbeitet, entfernt oder neu berechnet, gewinnt die spätere Nutzeraktion.
+ */
+export function replaceSegmentIfUnchanged(cur: Project, base: RouteSegment, next: RouteSegment): Project {
+  if (!cur.journey.segments.includes(base)) return cur;
+  return touch({ ...cur, journey: { ...cur.journey, segments: cur.journey.segments.map((s) => (s === base ? next : s)) } });
 }
 
 /** GPX-Track als Stopps + aufgezeichnetes Segment anhängen. Zeiten werden nur übernommen, wenn vorhanden. */

@@ -23,15 +23,18 @@
 | Zoom und Pause am Zwischenstopp | Verifiziert (Unit) | `scene.test.ts` |
 | Kamera-Übergang hält Fahrzeug im Bild; Label-Kollisionsvermeidung | Verifiziert (Unit + Frame-Sichtprüfung) | `scene.test.ts` |
 | Code-Splitting (Start-JS 105 KB gzip) | Verifiziert (Build) | `npm run build` |
-| CI-Workflow (Typecheck, Tests, Build, Audit) | Angelegt, läuft erst nach Push | `.github/workflows/ci.yml` |
+| CI-Workflow (Typecheck, Tests, Build, Audit) | Verifiziert (GitHub Actions grün) | `.github/workflows/ci.yml` |
+| Offline-Start nach Erstinstallation (SW-Precache aller gehashten Bundles, `ignoreVary`) | Verifiziert (E2E Sandbox, 10/10 unter Last) | `robustness.spec.ts` |
+| Autosave-Flush beim Verlassen (Zurück, Reload, Hintergrund) | Verifiziert (E2E Sandbox) | `robustness.spec.ts` |
+| Race-Fixes: verspätete Routing-Antwort überschreibt keine Bearbeitung; spät geladene Karte zeigt aktuellen Stand | Verifiziert (Unit + E2E) | `project.test.ts`, `robustness.spec.ts` |
 | DE/EN | Implementiert | Typprüfung erzwingt vollständiges EN |
 | PWA: Manifest, Icons (RouteVFX), Service Worker (App-Shell + Geodaten) | Implementiert, ungetestet | – |
 | CSP im Produktions-Build | Implementiert; App läuft unter CSP im E2E | E2E (Preview-Build) |
 
 ### Testergebnisse dieses Schritts
 - `npm run typecheck`: ohne Fehler.
-- `npx vitest run`: **9 Dateien, 59 Tests bestanden.**
-- `npx playwright test` (Chrome for Testing 141, Pixel-7-Emulation, SwiftShader): **10 E2E-Tests bestanden** – Export 1080p30/1080p60/4k30/4k60 (je ffprobe-geprüft), Reload-Persistenz, GPX-UI inkl. Ablehnung, Exportabbruch, Szenario 2 (multimodales Video), Linienkorrektur.
+- `npx vitest run`: **9 Dateien, 61 Tests bestanden.**
+- `npx playwright test` (Chrome for Testing 141, Pixel-7-Emulation, SwiftShader): **13 E2E-Tests bestanden** – Export 1080p30/1080p60/4k30/4k60 (je ffprobe-geprüft), Reload-Persistenz, GPX-UI inkl. Ablehnung, Exportabbruch, Szenario 2 (multimodales Video), Linienkorrektur, Offline-Start, Autosave-Flush, langsam ladende Karte.
 - `npm audit --audit-level=high`: 0 Funde.
 
 ### Bekannte kleine Mängel (offen)
@@ -40,7 +43,7 @@
 - Sehr kurze Abschnitte (z. B. Stadt → Flughafen) zeigen auf Natural Earth kaum Kartendetails (R-01).
 
 ### Ausdrücklich offen / nicht getestet
-GPS-Aufzeichnung · Kartenlink-Import · Re-Routing über Ziehpunkte (online) · Routing-Wegpunkte-UI · Touch-Ziehen auf echten Geräten · Timeline-Keyframes · erweiterter Editor · Fotos/Clips/Logos · Voice-over · SFX/Musikbibliothek · Effekte/Übergänge · 2D-Upload/3D-Modelle · Audio im Export · Web Share · Offline-Betrieb · Reload-Persistenz im Browser · alle Gerätetests (iPhone/Android) · Accessibility-Prüfung · Admin/Cloud.
+GPS-Aufzeichnung · Kartenlink-Import · Service-Worker-Update-Ablauf · Re-Routing über Ziehpunkte (online) · Routing-Wegpunkte-UI · Touch-Ziehen auf echten Geräten · Timeline-Keyframes · erweiterter Editor · Fotos/Clips/Logos · Voice-over · SFX/Musikbibliothek · Effekte/Übergänge · 2D-Upload/3D-Modelle · Audio im Export · Web Share · Offline-Betrieb · Reload-Persistenz im Browser · alle Gerätetests (iPhone/Android) · Accessibility-Prüfung · Admin/Cloud.
 
 ### Blocker (deine Entscheidung nötig)
 1. **Kartenquelle mit Straßen/Städten (R-01):** Natural Earth ist lizenzsauber, aber grob. Optionen: (a) OSM-Vektorkacheln selbst als PMTiles auf statischem Hosting (kostenlos möglich, Lizenz ODbL mit Attribution im Video; Datengröße/Hosting-Limits zu prüfen) oder (b) OpenFreeMap-Instanz (Bedingungen müssen verifiziert werden). Apple MapKit erfordert eine kostenpflichtige Mitgliedschaft und hat keine nachgewiesene Exporterlaubnis.
@@ -61,7 +64,7 @@ GPS-Aufzeichnung · Kartenlink-Import · Re-Routing über Ziehpunkte (online) ·
 
 ### Nächste konkrete Schritte
 1. CI (GitHub Actions: Typecheck + Unit-Tests; E2E mit Chrome for Testing).
-2. E2E: Offline-Modus, Hintergrund-Abbruch, Service-Worker-Update.
+2. E2E: Hintergrund-Abbruch, Service-Worker-Update.
 3. Streaming-Export (OPFS) gegen RAM-Grenze (R-06).
 4. Timeline-Editor mit Kamera-/Text-Keyframes (Ent. 13/14, Szenario 6).
 5. Geräte-Probe-Seite für iPhone/Android-Messungen (E08/E09/E13).

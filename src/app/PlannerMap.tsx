@@ -1,5 +1,5 @@
 import '../adapters/maps/setup';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Map as MlMap, type GeoJSONSource, type MapMouseEvent, type MapTouchEvent } from 'maplibre-gl';
 import type { Project } from '../core/project/schema';
 import { buildStyle } from '../adapters/maps/styles';
@@ -26,7 +26,12 @@ export function PlannerMap({ project, onTap, edit }: { project: Project; onTap: 
   tapRef.current = onTap;
   const editRef = useRef(edit);
   editRef.current = edit;
+  // Aktueller Projektstand für den (asynchronen) load-Handler – sonst zeichnet eine spät geladene Karte einen veralteten Stand.
+  const projectRef = useRef(project);
+  projectRef.current = project;
   const loaded = useRef(false);
+  const prevStops = useRef(0);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     const map = new MlMap({
@@ -61,8 +66,10 @@ export function PlannerMap({ project, onTap, edit }: { project: Project; onTap: 
         },
       });
       loaded.current = true;
-      update(map, project, true);
+      update(map, projectRef.current, true);
+      prevStops.current = projectRef.current.journey.stops.length;
       updateHandles(map, editRef.current?.points ?? null);
+      setReady(true);
     });
 
     // Ziehen von Kontrollpunkten (Maus + Touch)
@@ -123,11 +130,11 @@ export function PlannerMap({ project, onTap, edit }: { project: Project; onTap: 
       map.remove();
       mapRef.current = null;
       loaded.current = false;
+      setReady(false);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project.mapStyleRef]);
 
-  const prevStops = useRef(0);
   useEffect(() => {
     const map = mapRef.current;
     if (map && loaded.current) {
@@ -147,6 +154,7 @@ export function PlannerMap({ project, onTap, edit }: { project: Project; onTap: 
       className={`planner-map${edit ? ' editing' : ''}`}
       role="application"
       aria-label="Map"
+      aria-busy={!ready}
       data-testid="planner-map"
     />
   );

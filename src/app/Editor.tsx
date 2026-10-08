@@ -33,22 +33,45 @@ export function Editor({ projectId, close }: { projectId: string; close: () => v
       .catch((e: Error) => setLoadError(e.message));
   }, [projectId]);
 
-  // Autosave mit Debounce
+  // Autosave mit Debounce. Ein noch ausstehender Stand wird beim Verlassen (Zurück, Reload, Tab schließen,
+  // App in den Hintergrund) sofort geschrieben, damit der Debounce keine Änderungen verwirft.
   const firstLoad = useRef(true);
+  const pending = useRef<Project | null>(null);
+  const persist = useCallback((p: Project) => {
+    if (pending.current === p) pending.current = null;
+    return saveProject(p)
+      .then(() => setSave('saved'))
+      .catch((e) => setSave(e instanceof StorageError && e.code === 'quota' ? 'quota' : 'error'));
+  }, []);
+  const flush = useCallback(() => {
+    const p = pending.current;
+    if (p) void persist(p);
+  }, [persist]);
+
   useEffect(() => {
     if (!project) return;
     if (firstLoad.current) {
       firstLoad.current = false;
       return;
     }
+    pending.current = project;
     setSave('saving');
-    const h = setTimeout(() => {
-      saveProject(project)
-        .then(() => setSave('saved'))
-        .catch((e) => setSave(e instanceof StorageError && e.code === 'quota' ? 'quota' : 'error'));
-    }, 500);
+    const h = setTimeout(() => void persist(project), 500);
     return () => clearTimeout(h);
-  }, [project]);
+  }, [project, persist]);
+
+  useEffect(() => {
+    const onHidden = () => {
+      if (document.visibilityState === 'hidden') flush();
+    };
+    window.addEventListener('pagehide', flush);
+    document.addEventListener('visibilitychange', onHidden);
+    return () => {
+      window.removeEventListener('pagehide', flush);
+      document.removeEventListener('visibilitychange', onHidden);
+      flush(); // Unmount (z. B. „Zurück“)
+    };
+  }, [flush]);
 
   const commit = useCallback((next: Project | ((p: Project) => Project)) => {
     setProject((cur) => {

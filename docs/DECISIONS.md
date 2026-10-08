@@ -113,7 +113,7 @@ Repository `RouteVFX-Animated-Route-Creator` mit Logo-Assets → App-Name „Rou
 | 32 | DE + EN | Implementiert | EN-Wörterbuch typgeprüft vollständig. |
 | 33 | Begründeter kostenloser Stack | Erledigt (dieses Dokument) | |
 | 34 | Umfassende V1 phasenweise | Laufend | |
-| 35 | Offline-Bearbeitung | Implementiert, ungetestet | Service Worker + gebündelte Geodaten. |
+| 35 | Offline-Bearbeitung | Teilweise verifiziert | Service Worker precacht alle Bundles + Geodaten; Offline-E2E (Sandbox) bestanden; Geräte offen. |
 | 36 | Fahrzeugbibliothek, eigene Assets | Teilweise | 8 Symbole + Farbe; Uploads/Admin nicht begonnen. |
 | 37 | Reduziertes, iOS-inspiriertes Design | Implementiert | Eigene Gestaltung, keine Apple-Assets. |
 | 38 | Budgets und Tests als Releasepflicht | Teilweise | PERFORMANCE.md (Entwurf), Tests vorhanden; Gerätetests offen. |
