@@ -1,6 +1,7 @@
 import { openDB, type IDBPDatabase } from 'idb';
 import { migrateAndValidate, ProjectLoadError } from '../../core/project/migrations';
 import type { Project } from '../../core/project/schema';
+import { newId } from '../../core/project/factory';
 
 /**
  * Lokale Persistenz (IndexedDB). Projekte als validiertes JSON, Medien getrennt als Blobs.
@@ -100,6 +101,35 @@ export async function deleteProject(id: string): Promise<void> {
   const idx = tx.objectStore('blobs').index('projectId');
   for (const key of await idx.getAllKeys(id)) await tx.objectStore('blobs').delete(key);
   await tx.done;
+}
+
+/**
+ * Dupliziert ein Projekt samt referenzierter Medien-Blobs (neue IDs, neuer Projektbezug) in einer Transaktion.
+ * So bleibt die Kopie vollständig, auch wenn das Original später gelöscht wird.
+ */
+export async function duplicateProject(p: Project, title: string): Promise<Project> {
+  const id = newId();
+  const now = new Date().toISOString();
+  const d = await db();
+  const tx = d.transaction(['projects', 'blobs'], 'readwrite');
+  const blobs = tx.objectStore('blobs');
+  let audio = p.audio;
+  if (audio) {
+    const b = (await blobs.get(audio.assetId)) as StoredBlob | undefined;
+    if (b) {
+      const assetId = newId();
+      await blobs.put({ ...b, id: assetId, projectId: id });
+      audio = { ...audio, assetId };
+    }
+  }
+  const copy = migrateAndValidate({ ...structuredClone(p), id, title: title.slice(0, 80), createdAt: now, modifiedAt: now, audio });
+  try {
+    await tx.objectStore('projects').put(copy);
+    await tx.done;
+  } catch (e) {
+    wrap(e);
+  }
+  return copy;
 }
 
 export async function putBlob(b: StoredBlob): Promise<void> {

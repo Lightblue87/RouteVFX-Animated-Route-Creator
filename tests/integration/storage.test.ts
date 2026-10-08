@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { deleteProject, getBlob, listProjects, loadProject, putBlob, saveProject, _resetDbHandle } from '../../src/adapters/storage/idb';
+import { deleteProject, duplicateProject, getBlob, listProjects, loadProject, putBlob, saveProject, _resetDbHandle } from '../../src/adapters/storage/idb';
 import { multimodalProject } from '../fixtures/project';
 import { openDB } from 'idb';
 
@@ -40,5 +40,20 @@ describe('IndexedDB storage', () => {
   it('refuses to persist invalid projects', async () => {
     const p = await multimodalProject();
     await expect(saveProject({ ...p, targetDurationMs: 999_999 })).rejects.toThrow();
+  });
+  it('duplicate copies the audio blob, so deleting the original keeps the copy intact', async () => {
+    const p = await multimodalProject();
+    await putBlob({ id: 'a1', projectId: p.id, name: 'm.mp3', type: 'audio/mpeg', size: 3, blob: new Blob(['abc']) });
+    const withAudio = { ...p, audio: { assetId: 'a1', fileName: 'm.mp3', gain: 1, fadeInMs: 0, fadeOutMs: 0, muted: false } };
+    await saveProject(withAudio);
+    const copy = await duplicateProject(withAudio, 'Kopie');
+    expect(copy.id).not.toBe(p.id);
+    expect(copy.audio!.assetId).not.toBe('a1');
+    await deleteProject(p.id);
+    expect(await getBlob('a1')).toBeUndefined();
+    const copied = await getBlob(copy.audio!.assetId);
+    expect(copied?.projectId).toBe(copy.id);
+    expect(copied).toMatchObject({ name: 'm.mp3', type: 'audio/mpeg', size: 3 }); // Blob-Inhalt: fake-indexeddb/jsdom stellt Blob-Methoden nicht wieder her
+    expect((await loadProject(copy.id))?.title).toBe('Kopie');
   });
 });

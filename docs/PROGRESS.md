@@ -33,8 +33,8 @@
 
 ### Testergebnisse dieses Schritts
 - `npm run typecheck`: ohne Fehler.
-- `npx vitest run`: **9 Dateien, 61 Tests bestanden.**
-- `npx playwright test` (Chrome for Testing 141, Pixel-7-Emulation, SwiftShader): **13 E2E-Tests bestanden** – Export 1080p30/1080p60/4k30/4k60 (je ffprobe-geprüft), Reload-Persistenz, GPX-UI inkl. Ablehnung, Exportabbruch, Szenario 2 (multimodales Video), Linienkorrektur, Offline-Start, Autosave-Flush, langsam ladende Karte.
+- `npx vitest run`: **9 Dateien, 62 Tests bestanden.**
+- `npx playwright test` (Chrome for Testing 141, Pixel-7-Emulation, SwiftShader): **14 E2E-Tests bestanden** – Export 1080p30/1080p60/4k30/4k60 (je ffprobe-geprüft), Reload-Persistenz, GPX-UI inkl. Ablehnung, Exportabbruch, Szenario 2 (multimodales Video), Linienkorrektur, Offline-Start, Autosave-Flush, langsam ladende Karte, Duplizieren inkl. Medienkopie.
 - `npm audit --audit-level=high`: 0 Funde.
 
 ### Bekannte kleine Mängel (offen)

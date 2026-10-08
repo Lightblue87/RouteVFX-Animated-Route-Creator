@@ -75,3 +75,19 @@ test('Langsam ladende Karte zeigt danach den aktuellen Stand (Route + Einpassen)
   await page.mouse.up();
   await expect(page.getByTestId('segment-confidence')).toHaveText(/Manuell|Manually/);
 });
+
+test('Projekt duplizieren und Original löschen – Kopie bleibt erhalten', async ({ page }) => {
+  page.on('dialog', (d) => d.accept());
+  await page.goto('/');
+  await page.getByTestId('create-project').click();
+  await page.getByTestId('tab-animate').click();
+  await page.getByTestId('title-input').fill('Original');
+  await expect(page.getByTestId('save-state')).toHaveText(/Gespeichert|Saved/);
+  await page.getByRole('button', { name: /Zurück|Back/ }).click();
+  await page.getByRole('listitem').filter({ hasText: 'Original' }).getByRole('button', { name: /Duplizieren|Duplicate/ }).click();
+  await expect(page.getByText('Original (2)')).toBeVisible();
+  await page.getByRole('listitem').filter({ hasText: /^Original\b(?! \(2\))/ }).getByRole('button', { name: /Löschen|Delete/ }).click();
+  await page.reload();
+  await expect(page.getByText('Original (2)')).toBeVisible();
+  await expect(page.getByRole('listitem')).toHaveCount(1);
+});

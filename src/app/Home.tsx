@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useI18n } from './App';
-import { createProject, newId } from '../core/project/factory';
+import { createProject } from '../core/project/factory';
 import type { Project } from '../core/project/schema';
-import { deleteProject, listProjects, requestPersistence, saveProject } from '../adapters/storage/idb';
+import { deleteProject, duplicateProject, listProjects, requestPersistence, saveProject } from '../adapters/storage/idb';
 
 export function Home({ open }: { open: (id: string) => void }) {
   const { t, locale, setLocale } = useI18n();
@@ -29,8 +29,7 @@ export function Home({ open }: { open: (id: string) => void }) {
     open(p.id);
   };
   const duplicate = async (p: Project) => {
-    const now = new Date().toISOString();
-    await saveProject({ ...structuredClone(p), id: newId(), title: `${p.title || t('common.untitled')} (2)`.slice(0, 80), createdAt: now, modifiedAt: now });
+    await duplicateProject(p, `${p.title || t('common.untitled')} (2)`);
     void refresh();
   };
   const remove = async (p: Project) => {
