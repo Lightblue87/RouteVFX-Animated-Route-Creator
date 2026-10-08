@@ -20,11 +20,12 @@ Hochrechnung (nur Sandbox): 180 s 1080p30 ≈ 5.400 Frames ≈ 40–110 min; 180
 | Datei | Größe | gzip |
 |---|---|---|
 | Start (index) | 338 KB | 105 KB |
-| Editor (MapLibre, UI) – lazy | 1.071 KB | 293 KB |
+| Editor (MapLibre, UI, pmtiles, Protomaps-Stil) – lazy | 1.136 KB | 309 KB |
 | Export-Panel (mediabunny) – lazy | 499 KB | 127 KB |
 | MapLibre-Worker | 508 KB | – |
 | CSS | 89 KB | 12 KB |
 | Geodaten (Länder, Seen, Orte, Flughäfen) | ≈ 2,3 MB | ≈ 0,7 MB |
+| Karten-Schriften/Sprites (`basemap-assets`, nur bei OSM-Stil, bei Bedarf geladen, nicht precacht) | ≈ 2,2 MB gesamt (3 Schriftschnitte × 7 Glyphenbereiche) | PBF bereits komprimiert |
 
 ## 2. Vorgeschlagene Budgets (Zielwerte, noch NICHT auf Geräten gemessen)
 

@@ -20,6 +20,9 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET' || url.origin !== self.location.origin) return;
+  // Range-Requests (z. B. PMTiles-Kacheln bei gleich-originigem Hosting) nie aus dem Cache bedienen oder cachen:
+  // keine Kachel-Vorratshaltung, und Teilantworten (206) dürfen nicht als ganze Datei im Cache landen.
+  if (e.request.headers.has('range')) return;
   if (e.request.mode === 'navigate') {
     e.respondWith(fetch(e.request).then((r) => { const copy = r.clone(); caches.open(CACHE).then((c) => c.put('./index.html', copy)); return r; }).catch(() => caches.match('./index.html', { ignoreVary: true })));
     return;
@@ -28,7 +31,8 @@ self.addEventListener('fetch', (e) => {
   // angefragt, der Precache-Eintrag ohne – sonst Cache-Fehltreffer offline. Assets sind per Hash versioniert.
   e.respondWith(
     caches.match(e.request, { ignoreVary: true }).then((hit) => hit || fetch(e.request).then((r) => {
-      if (r.ok && (url.pathname.includes('/assets/') || url.pathname.includes('/geodata/'))) {
+      // Glyphen/Sprites der Detailkarte werden bei Nutzung gecacht (eigene, lizenzierte Dateien; keine Kacheln).
+      if (r.ok && r.status === 200 && (url.pathname.includes('/assets/') || url.pathname.includes('/geodata/') || url.pathname.includes('/basemap-assets/'))) {
         const copy = r.clone();
         caches.open(CACHE).then((c) => c.put(e.request, copy));
       }

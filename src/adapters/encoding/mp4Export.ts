@@ -62,6 +62,7 @@ export async function exportMp4(req: ExportRequest): Promise<ExportResult> {
   const renderer = new MapLibreSceneRenderer({
     container: host,
     styleId: styleInfo.exportAllowed ? styleInfo.id : 'ne-light',
+    lang: project.locale,
     pixelRatio: profile.width / 540,
     interactive: false,
     forCapture: true,

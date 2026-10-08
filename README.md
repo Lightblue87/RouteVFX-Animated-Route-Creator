@@ -26,6 +26,8 @@ Für den E2E-Export wird ein Chrome mit proprietären Codecs benötigt (z. B. *C
 
 `npm run data:build` erzeugt `public/geodata/*` reproduzierbar aus einem gepinnten Natural-Earth-Commit.
 
+**Detailkarte (optional):** Mit `VITE_PMTILES_URL=https://…/basemap.pmtiles npm run build` werden die Stile „OpenStreetMap hell/dunkel“ aktiv (Protomaps-Basemap-Build v4, selbst gehostet; Host muss Range-Requests und CORS erlauben). Ohne URL bleiben sie deaktiviert. `npm run test:e2e` baut mit einem synthetischen Testarchiv (`tests/fixtures/mini.pmtiles`, erzeugt mit `npm run data:test-pmtiles`).
+
 ## Architektur (Kurz)
 ```
 src/core/        reine Logik: types, geodesy, project (Schema/Migration), timeline, scene (evaluateScene)
@@ -38,6 +40,7 @@ docs/            Entscheidungen, Risiken, Nachweise, Kosten, Abnahme, Fortschrit
 ```
 
 ## Daten & Lizenzen
-- Kartendaten: [Natural Earth](https://www.naturalearthdata.com/) (gemeinfrei)
+- Kartendaten: [Natural Earth](https://www.naturalearthdata.com/) (gemeinfrei); optional OpenStreetMap über selbst gehostete PMTiles (© OpenStreetMap contributors, ODbL)
+- Kartenstil: [@protomaps/basemaps](https://github.com/protomaps/basemaps) (BSD-3, Design CC0); Schriften Noto Sans (SIL OFL 1.1), Sprites (MIT) in `public/basemap-assets/`
 - Bibliotheken: siehe `docs/EXTERNAL_EVIDENCE.md`
 - Logos in `assets/logos/`: Eigentum des Repository-Owners

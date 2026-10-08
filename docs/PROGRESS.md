@@ -15,6 +15,7 @@
 | GPX-Parser (trk/rte/wpt, Limits, XXE-Schutz) | Verifiziert (Unit); UI-Import ungetestet | `tests/unit/gpx.test.ts` |
 | IndexedDB-Speicher, Autosave, Undo/Redo, Löschen mit Bestätigung, Duplizieren | Speicher verifiziert (Integration); UI teilweise (E2E-Autosave) | `tests/integration/storage.test.ts` |
 | Karte: MapLibre 6 + Natural Earth hell/dunkel, offline | Verifiziert (Sandbox) | E2E + Frame-Sichtprüfung |
+| Detailkarte OSM hell/dunkel über selbst gehostete PMTiles (R-01) | **Implementiert; mit synthetischem Testarchiv verifiziert (Sandbox)**; standardmäßig deaktiviert bis Hosting-Freigabe; echter Protomaps-Build und Export mit OSM-Stil ungetestet | `tests/unit/basemap.test.ts`, `tests/e2e/basemap.spec.ts` |
 | 9:16-Vorschau mit Play/Scrub (gleicher Evaluator wie Export) | Implementiert | nur manuell/indirekt |
 | MP4-Export WebCodecs H.264 + mediabunny, Capability-Probe, Abbruch, Rücklese-Prüfung | **1080p30 verifiziert (Sandbox)**, weitere s. RELEASE_MATRIX | `tests/e2e/export.spec.ts`, `tests/e2e/profiles.spec.ts` |
 | Audio-Mix (Gain, Fades, Stumm) → AAC | Implementiert, **nicht verifiziert** (kein AAC in Sandbox) | – |
@@ -54,6 +55,12 @@ GPS-Aufzeichnung · Kartenlink-Import · Service-Worker-Update-Ablauf · Re-Rout
 ### Weiterhin offen (kein Merge-Blocker für Phase 0)
 - **Gerätetests:** Ein iPhone und ein Android-Gerät müssen den Prototyp ausführen; ohne das bleiben alle Exportprofile auf „Sandbox“ und es gibt keine öffentliche Freigabe.
 
+## Stand 2026-10-08 – Arbeitsschritt 2 (Detailkarte PMTiles, R-01)
+- Geliefert: OSM-Stile hell/dunkel über selbst gehostete PMTiles (deaktiviert ohne `VITE_PMTILES_URL`), Natural-Earth-Unterlage als Offline-Fallback, gebündelte Schriften/Sprites mit Lizenzdateien, CSP-Erweiterung nur für https-Origin, Service Worker cacht keine Kacheln, UI-Hinweise (nicht eingerichtet / Fallback / Attributionspflicht) DE+EN.
+- Tests (Sandbox): `npm run typecheck` ohne Fehler; Vitest 76/76; Nicht-Export-E2E 10/10 mit Playwright-Chromium 1194, darunter 2 neue Detailkarten-Tests (Kacheln nur per 206-Range-Request, OSM-Attribution, Planungskarte, Reload, unerreichbare Datei). Screenshots manuell geprüft (Straßen, Gewässer, Park, Ortslabel aus Testarchiv sichtbar).
+- **Nicht getestet:** echter Protomaps-Planet-/Regional-Build, reale Hosts (Range/CORS), MP4-Export mit OSM-Stil (kein H.264-Chrome in dieser Sitzung), Geräte.
+- **Blocker:** Hosting-Freigabe (Konto, ggf. Zahlungsmethode bei R2) und Wahl des Datenausschnitts.
+
 ## Phasenplan
 
 | Phase | Inhalt | Stand |
@@ -67,7 +74,7 @@ GPS-Aufzeichnung · Kartenlink-Import · Service-Worker-Update-Ablauf · Re-Rout
 | 6 Cloud/Admin | Auth, Sync, RLS, Admin, Kostenkontrolle | Nicht begonnen |
 
 ### Nächste konkrete Schritte
-1. PMTiles-Detailkarte (R-01) und Routing-Free-Tier (R-03) gemäß Entscheidungen – Bedingungen belegen, dann umsetzen.
+1. PMTiles: Hosting + Datenausschnitt freigeben (s. COST_MODEL), dann echten Build testen und Export mit OSM-Stil prüfen. Routing-Free-Tier (R-03): Bedingungen belegen, dann umsetzen.
 2. E2E: Hintergrund-Abbruch, Service-Worker-Update.
 3. Streaming-Export (OPFS) gegen RAM-Grenze (R-06).
 4. Timeline-Editor mit Kamera-/Text-Keyframes (Ent. 13/14, Szenario 6).

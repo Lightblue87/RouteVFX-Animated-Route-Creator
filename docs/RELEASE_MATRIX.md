@@ -31,4 +31,4 @@ Siehe `ACCEPTANCE.md`. Zusammenfassung: 1 OFFEN (teilw.) · 2 PASS (Sandbox) · 
 | CSP im Build | implementiert; App lief unter CSP im E2E |
 | GPX: XXE/DOCTYPE, Größenlimits, Textausgabe ohne HTML | PASS (Unit) |
 | Accessibility (VoiceOver/TalkBack, Kontrast, Fokus) | OFFEN |
-| Lizenzprüfung Karten/Assets | Natural Earth PASS; alles andere nicht ausgeliefert |
+| Lizenzprüfung Karten/Assets | Natural Earth PASS; OSM-PMTiles (ODbL + Attribution), Protomaps-Stil (BSD-3/CC0), Noto Sans (OFL), Sprites (MIT) PASS (Doku/Lizenzdateien); Hosting-Bedingungen OFFEN |
