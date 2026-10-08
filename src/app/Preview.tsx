@@ -31,7 +31,7 @@ export function Preview({ project }: { project: Project }) {
   }, []);
 
   useEffect(() => {
-    const r = new MapLibreSceneRenderer({ container: mapRef.current!, styleId: project.mapStyleRef, pixelRatio: Math.min(2, devicePixelRatio || 1), interactive: false, forCapture: false });
+    const r = new MapLibreSceneRenderer({ container: mapRef.current!, styleId: project.mapStyleRef, lang: project.locale, pixelRatio: Math.min(2, devicePixelRatio || 1), interactive: false, forCapture: false });
     rendererRef.current = r;
     r.map.on('render', () => draw());
     return () => {
@@ -39,7 +39,7 @@ export function Preview({ project }: { project: Project }) {
       rendererRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [project.mapStyleRef]);
+  }, [project.mapStyleRef, project.locale]);
 
   const stateRef = useRef({ model, tMs, locale });
   stateRef.current = { model, tMs, locale };

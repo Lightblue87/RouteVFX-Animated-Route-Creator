@@ -20,7 +20,7 @@ Hochrechnung (nur Sandbox): 180 s 1080p30 ≈ 5.400 Frames ≈ 40–110 min; 180
 | Datei | Größe | gzip |
 |---|---|---|
 | Start (index) | 338 KB | 105 KB |
-| Editor (MapLibre, UI) – lazy | 1.071 KB | 293 KB |
+| Editor (MapLibre, UI, OpenFreeMap-Stile) – lazy | 1.124 KB | 300 KB |
 | Export-Panel (mediabunny) – lazy | 499 KB | 127 KB |
 | MapLibre-Worker | 508 KB | – |
 | CSS | 89 KB | 12 KB |

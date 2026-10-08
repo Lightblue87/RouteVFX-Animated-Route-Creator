@@ -10,10 +10,11 @@ const CSP = [
   "default-src 'self'",
   "script-src 'self'",
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob:",
+  // tiles.openfreemap.org: Kacheln, Glyphen, Sprites der Detailkarte (nur wenn der Stil gewählt ist)
+  "img-src 'self' data: blob: https://tiles.openfreemap.org",
   "media-src 'self' blob:",
   "worker-src 'self' blob:",
-  "connect-src 'self' https://routing.openstreetmap.de https://nominatim.openstreetmap.org",
+  "connect-src 'self' https://routing.openstreetmap.de https://nominatim.openstreetmap.org https://tiles.openfreemap.org",
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'none'",

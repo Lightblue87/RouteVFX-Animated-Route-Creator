@@ -3,6 +3,7 @@ import { buildSceneModel, evaluateScene } from '../../core/scene/evaluate';
 import type { Project } from '../../core/project/schema';
 import { EXPORT_PROFILES, type ExportProfileId } from '../../core/types';
 import { MapLibreSceneRenderer } from '../maps/maplibreRenderer';
+import { isOnlineMapReachable } from '../maps/availability';
 import { getStyleInfo } from '../maps/styles';
 import { VIDEO_BITRATE } from './capabilities';
 import type { Locale } from '../../i18n';
@@ -58,10 +59,17 @@ export async function exportMp4(req: ExportRequest): Promise<ExportResult> {
   host.setAttribute('aria-hidden', 'true');
   host.style.cssText = 'position:fixed;left:-20000px;top:0;pointer-events:none;';
   document.body.appendChild(host);
-  const styleInfo = getStyleInfo(project.mapStyleRef);
+  let styleInfo = getStyleInfo(project.mapStyleRef);
+  if (!styleInfo.exportAllowed) styleInfo = getStyleInfo('ne-light');
+  // Online-Karte nicht erreichbar → transparent auf Natural Earth gleicher Helligkeit ausweichen statt abzubrechen.
+  if (styleInfo.online && !(await isOnlineMapReachable())) {
+    styleInfo = getStyleInfo(styleInfo.variant === 'dark' ? 'ne-dark' : 'ne-light');
+    warnings.push('map_online_unavailable');
+  }
   const renderer = new MapLibreSceneRenderer({
     container: host,
-    styleId: styleInfo.exportAllowed ? styleInfo.id : 'ne-light',
+    styleId: styleInfo.id,
+    lang: project.locale,
     pixelRatio: profile.width / 540,
     interactive: false,
     forCapture: true,

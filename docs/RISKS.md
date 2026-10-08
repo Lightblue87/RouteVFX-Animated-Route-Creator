@@ -4,7 +4,8 @@ Stand: 2026-10-08. Bewertung: Eintrittswahrscheinlichkeit (W) × Auswirkung (A),
 
 | # | Risiko | W | A | Prio | Bezug | Gegenmaßnahme / Fallback | Status |
 |---|---|---|---|---|---|---|---|
-| R-01 | **Keine exportlizenzierte, kostenlose Detailkarte** (Straßen, Städte, Satellit). Natural Earth zeigt nur Länder/Küsten/Seen – für Auto-/Rad-Routen optisch grob. | 3 | 3 | 9 | E04, Ent. 10/39 | **Entschieden 2026-10-08:** OSM-Vektorkacheln als selbst gehostete PMTiles auf statischem Hosting (ODbL, Attribution im Video). Größe/Hosting-Limits noch zu prüfen. Satellit/Hybrid bis Lizenznachweis gesperrt. | Entschieden, Umsetzung offen |
+| R-01 | **Keine exportlizenzierte, kostenlose Detailkarte** (Straßen, Städte, Satellit). Natural Earth zeigt nur Länder/Küsten/Seen – für Auto-/Rad-Routen optisch grob. | 3 | 3 | 9 | E04, Ent. 10/39 | **Entschieden 2026-10-08 (revidiert):** OpenFreeMap (kostenlos, Video mit Attribution erlaubt) statt eigener PMTiles (Planet ≈ 120 GB, nicht kostenlos hostbar). Implementiert; Rest-Risiko R-01b. Satellit/Hybrid bis Lizenznachweis gesperrt. | Mitigiert |
+| R-01b | **Abhängigkeit von OpenFreeMap** (spendenfinanziert, keine SLA; Bedingungen können sich ändern). | 2 | 2 | 4 | E04 | Standardstil bleibt Natural Earth; automatischer Rückfall bei Ausfall; Stile lokal gebündelt; Ausstieg: OpenFreeMap-Planet-Downloads (MBTiles/PMTiles) selbst hosten, sobald ein Budget freigegeben ist. Bedingungen vor Release erneut prüfen. | Offen (akzeptiert) |
 | R-02 | **Apple Maps nicht nutzbar** für Export (Rechte unklar) und nur mit kostenpflichtiger Developer-Mitgliedschaft. | 3 | 2 | 6 | E01–E03 | Apple nur ggf. als Editor-Vorschau nach Freigabe der Kosten; Export immer über lizenzierte Alternative, Unterschied in Vorschau kennzeichnen. | Blockiert |
 | R-03 | **Kein kostenloser, produktionstauglicher Routingdienst** bestätigt. FOSSGIS-Demo ist Best-Effort, Bedingungen nicht abrufbar. | 3 | 3 | 9 | E05, Ent. 07 | Opt-in + Drosselung + gekennzeichnete Näherung (umgesetzt). **Entschieden 2026-10-08:** Free-Tier mit API-Schlüssel (openrouteservice oder GraphHopper, Bedingungen vor Auswahl belegen); Selbsthosting nur mit Kostenfreigabe. | Entschieden, Umsetzung offen |
 | R-04 | **iOS Safari**: WebCodecs-H.264-Encoding, AAC, WebGL-Readback, Speicher – unbekannt. | 2 | 3 | 6 | E08/E09/E13 | Echte Feature-Detection umgesetzt; Feldtest auf iPhone zwingend vor Release. Fallback MediaRecorder (MP4, wenn unterstützt) evaluieren. | Offen |
@@ -25,7 +26,7 @@ Stand: 2026-10-08. Bewertung: Eintrittswahrscheinlichkeit (W) × Auswirkung (A),
 | R-19 | **Sandbox-Messwerte nicht repräsentativ** (Software-WebGL, keine Hardware-Encoder). | 3 | 2 | 6 | §14/§15 | Alle Messwerte als „Sandbox“ markiert; Gerätetests vor jeder Profilfreigabe. | Bewusst |
 
 ## Top-5 für die nächsten Schritte
-1. R-01 + R-03: Entscheidungen getroffen (PMTiles selbst gehostet; Routing Free-Tier mit Schlüssel) – Anbieterbedingungen belegen und umsetzen.
+1. R-01: Detailkarte über OpenFreeMap umgesetzt – gegen echten Dienst und im Export testen. R-03: Routing-Free-Tier belegen und umsetzen.
 2. R-04/R-05: Gerätetests iPhone + Android mit dem Prototyp (Profil-Probe-Seite liefert die Daten).
 3. R-06: Streaming-Export über OPFS statt RAM-Puffer.
 4. R-09/41: manuelle Geometriekorrektur.

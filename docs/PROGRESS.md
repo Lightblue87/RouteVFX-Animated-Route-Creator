@@ -15,6 +15,7 @@
 | GPX-Parser (trk/rte/wpt, Limits, XXE-Schutz) | Verifiziert (Unit); UI-Import ungetestet | `tests/unit/gpx.test.ts` |
 | IndexedDB-Speicher, Autosave, Undo/Redo, Löschen mit Bestätigung, Duplizieren | Speicher verifiziert (Integration); UI teilweise (E2E-Autosave) | `tests/integration/storage.test.ts` |
 | Karte: MapLibre 6 + Natural Earth hell/dunkel, offline | Verifiziert (Sandbox) | E2E + Frame-Sichtprüfung |
+| Detailkarte hell/dunkel über OpenFreeMap (R-01), nur nach Auswahl, mit Natural-Earth-Rückfall | **Implementiert; mit simuliertem Dienst verifiziert (Sandbox)**; echter Dienst, Export mit diesem Stil und Geräte ungetestet | `tests/unit/basemap.test.ts`, `tests/e2e/basemap.spec.ts` |
 | 9:16-Vorschau mit Play/Scrub (gleicher Evaluator wie Export) | Implementiert | nur manuell/indirekt |
 | MP4-Export WebCodecs H.264 + mediabunny, Capability-Probe, Abbruch, Rücklese-Prüfung | **1080p30 verifiziert (Sandbox)**, weitere s. RELEASE_MATRIX | `tests/e2e/export.spec.ts`, `tests/e2e/profiles.spec.ts` |
 | Audio-Mix (Gain, Fades, Stumm) → AAC | Implementiert, **nicht verifiziert** (kein AAC in Sandbox) | – |
@@ -47,12 +48,18 @@
 GPS-Aufzeichnung · Kartenlink-Import · Service-Worker-Update-Ablauf · Re-Routing über Ziehpunkte (online) · Routing-Wegpunkte-UI · Touch-Ziehen auf echten Geräten · Timeline-Keyframes · erweiterter Editor · Fotos/Clips/Logos · Voice-over · SFX/Musikbibliothek · Effekte/Übergänge · 2D-Upload/3D-Modelle · Audio im Export · Web Share · Offline-Betrieb · Reload-Persistenz im Browser · alle Gerätetests (iPhone/Android) · Accessibility-Prüfung · Admin/Cloud.
 
 ### Entscheidungen des Produktverantwortlichen (2026-10-08)
-1. **Kartenquelle mit Straßen/Städten (R-01):** OSM-Vektorkacheln als **selbst gehostete PMTiles** (ODbL-Attribution in UI und Video). Umsetzung in Folge-PR; Größe/Hosting-Limits vorher belegen.
+1. **Kartenquelle mit Straßen/Städten (R-01):** zuerst selbst gehostete PMTiles; nach der Kostenprüfung (Planet ≈ 120 GB, kein kostenloses Hosting ohne Zahlungsmethode) **revidiert zu OpenFreeMap** – umgesetzt in Arbeitsschritt 2.
 2. **Routing (R-03):** **Free-Tier mit API-Schlüssel** (openrouteservice oder GraphHopper), ohne Kosten/Kreditkarte; Bedingungen vor Auswahl belegen. FOSSGIS-OSRM bleibt bis dahin Opt-in-Prototyp.
 3. **Szenario 14 (Backend/Admin):** `DEFERRED_APPROVED` auf Phase 6.
 
 ### Weiterhin offen (kein Merge-Blocker für Phase 0)
 - **Gerätetests:** Ein iPhone und ein Android-Gerät müssen den Prototyp ausführen; ohne das bleiben alle Exportprofile auf „Sandbox“ und es gibt keine öffentliche Freigabe.
+
+## Stand 2026-10-08 – Arbeitsschritt 2 (Detailkarte, R-01)
+- Zuerst selbst gehostete PMTiles umgesetzt (Commit `844accc`), dann verworfen: Planet ≈ 120 GB passt in kein Freikontingent ohne Zahlungsmethode. Auf Wunsch des Produktverantwortlichen durch OpenFreeMap ersetzt (kostenlos, ohne Schlüssel, Video mit Attribution erlaubt).
+- Geliefert: Stile „OpenFreeMap hell/dunkel“ (Positron, Dark Matter) nur nach Auswahl, Hinweis zur Datenübertragung, Pflicht-Attribution in Vorschau und Video, Beschriftung in Projektsprache, Natural-Earth-Rückfall bis Zoom 7, CSP-Erweiterung.
+- Tests (Sandbox): Typecheck ohne Fehler; Vitest 75/75; Nicht-Export-E2E 10/10 (Playwright-Chromium 1194), darunter 2 neue OpenFreeMap-Tests mit **simuliertem** Dienst (synthetische Kacheln); Screenshots manuell geprüft.
+- **Nicht getestet:** echter Dienst tiles.openfreemap.org (Sandbox blockiert), MP4-Export mit OpenFreeMap-Stil (kein H.264-Chrome in dieser Sitzung), Geräte.
 
 ## Phasenplan
 
@@ -67,7 +74,7 @@ GPS-Aufzeichnung · Kartenlink-Import · Service-Worker-Update-Ablauf · Re-Rout
 | 6 Cloud/Admin | Auth, Sync, RLS, Admin, Kostenkontrolle | Nicht begonnen |
 
 ### Nächste konkrete Schritte
-1. PMTiles-Detailkarte (R-01) und Routing-Free-Tier (R-03) gemäß Entscheidungen – Bedingungen belegen, dann umsetzen.
+1. OpenFreeMap gegen den echten Dienst und im MP4-Export prüfen (außerhalb der Sandbox); Routing-Free-Tier (R-03): Bedingungen belegen, dann umsetzen.
 2. E2E: Hintergrund-Abbruch, Service-Worker-Update.
 3. Streaming-Export (OPFS) gegen RAM-Grenze (R-06).
 4. Timeline-Editor mit Kamera-/Text-Keyframes (Ent. 13/14, Szenario 6).

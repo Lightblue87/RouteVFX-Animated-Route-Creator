@@ -36,7 +36,7 @@ export function PlannerMap({ project, onTap, edit }: { project: Project; onTap: 
   useEffect(() => {
     const map = new MlMap({
       container: ref.current!,
-      style: buildStyle(project.mapStyleRef, document.baseURI),
+      style: buildStyle(project.mapStyleRef, document.baseURI, project.locale),
       center: [10, 50],
       zoom: 3,
       attributionControl: { compact: true },
@@ -133,7 +133,7 @@ export function PlannerMap({ project, onTap, edit }: { project: Project; onTap: 
       setReady(false);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [project.mapStyleRef]);
+  }, [project.mapStyleRef, project.locale]);
 
   useEffect(() => {
     const map = mapRef.current;

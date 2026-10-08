@@ -119,6 +119,7 @@ export function ExportPanel({ project }: { project: Project }) {
           <p className="small" data-testid="export-summary">
             {t('export.done', { size: `${(result.blob.size / 1e6).toFixed(1)} MB`, codec: result.mimeType })} · {result.verified.width}×{result.verified.height} · {result.verified.fps} fps · {result.verified.durationS.toFixed(2)} s · {(result.renderMs / 1000).toFixed(1)} s Renderzeit
           </p>
+          {result.warnings.includes('map_online_unavailable') && <p className="small warn" role="status" data-testid="export-warning">{t('export.mapFallback')}</p>}
           <div className="row">
             <a className="btn primary" href={result.url} download={fileName} data-testid="export-download">{t('export.save')}</a>
             {canShareFiles && <button className="btn" onClick={share}>{t('export.share')}</button>}

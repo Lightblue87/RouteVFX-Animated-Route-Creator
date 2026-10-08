@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { useI18n } from './App';
 import type { ProjectApi } from './Editor';
 import { Preview } from './Preview';
-import { MAP_STYLES } from '../adapters/maps/styles';
+import { getStyleInfo, MAP_STYLES } from '../adapters/maps/styles';
 import { updateSegment } from '../features/projects/journey';
 import { planTimeline } from '../core/timeline';
 import { putBlob } from '../adapters/storage/idb';
@@ -57,10 +57,20 @@ export function AnimatePanel({ api }: { api: ProjectApi }) {
         </fieldset>
         <label className="field">
           {t('anim.style')}
-          <select value={project.mapStyleRef} onChange={(e) => set({ mapStyleRef: e.target.value })}>
+          <select
+            value={project.mapStyleRef}
+            data-testid="map-style"
+            onChange={(e) => {
+              const next = getStyleInfo(e.target.value);
+              // Online-Kartenstil: Kacheln kommen vom Drittanbieter – im Projekt vermerken (Datenschutz-Transparenz).
+              set({ mapStyleRef: next.id, ...(next.online ? { privacy: { usedOnlineServices: true } } : {}) });
+            }}
+          >
             {MAP_STYLES.map((s) => <option key={s.id} value={s.id}>{s.provider} – {s.variant}</option>)}
           </select>
         </label>
+        {getStyleInfo(project.mapStyleRef).online && <p className="small muted" data-testid="map-style-online">{t('anim.styleOnline')}</p>}
+        {getStyleInfo(project.mapStyleRef).attributionRequired && <p className="small muted">{t('anim.styleAttribution', { text: getStyleInfo(project.mapStyleRef).attribution })}</p>}
         {project.journey.segments.map((s, i) => (
           <div key={s.id} className="card">
             <strong className="small">{t('route.segment', { n: i + 1 })} · {t(`mode.${s.mode}`)}</strong>

@@ -7,6 +7,7 @@ Stand: 2026-10-08. Grundsatz: **Nullkosten beim Start**. Keine kostenpflichtigen
 | Kostenposition | Aktuelle Lösung | Kosten pro Einheit | Worst Case |
 |---|---|---|---|
 | Kartenansicht | Natural Earth, im App-Bundle (≈ 2,3 MB unkomprimiert, ≈ 0,7 MB gzip) | 0 € (gemeinfrei, kein Kachelserver) | Nur Hosting-Traffic (s. u.) |
+| Detailkarte (nach Auswahl) | OpenFreeMap, öffentliche Instanz | 0 €, keine Limits laut README, kein Konto | Ausfall/Änderung der Bedingungen → Rückfall Natural Earth (R-01b) |
 | Geocoding | Offline-Suche (Natural Earth) | 0 € | – |
 | Geocoding online (Opt-in) | Nominatim (OSMF) | 0 €, aber Fair-Use-Richtlinie | Sperrung der IP bei Missbrauch → Fallback offline |
 | Routing | Lokal (Großkreis/Näherung) | 0 € | – |
@@ -26,7 +27,7 @@ Rechenbeispiel: 10.000 Erstaufrufe/Monat ≈ 11 GB Traffic. Ob das im Free-Plan 
 | Option | Bekannte Kosten / Quoten | Verifiziert? |
 |---|---|---|
 | Apple MapKit JS | Apple Developer Program Mitgliedschaft (kostenpflichtig); 250.000 Map-Views + 25.000 Service-Calls/Tag frei | Quoten ja (developer.apple.com/maps/web), Mitgliedsbeitrag nein |
-| Selbst gehostete OSM-Vektorkacheln (PMTiles) | Speicher/Traffic beim Hoster (Planet-Extrakt mehrere GB) | Nein |
+| Selbst gehostete OSM-Vektorkacheln (PMTiles) | Planet ≈ 120 GB (Protomaps-Doku); Cloudflare R2 frei nur 10 GB und laut Drittanleitungen mit Zahlungsmethode | Teilweise (Doku-Suche) – **verworfen**, solange Nullkosten gelten |
 | Routing mit API-Schlüssel (openrouteservice, GraphHopper) | Free-Tier mit Tageslimits | Nein |
 | Eigener Routing-Server (OSRM/Valhalla) | VM mit viel RAM → laufende Kosten | Nein – nur mit Freigabe |
 | Serverseitiges Rendering | CPU/GPU-Zeit je Video | Nein – laut CLAUDE.md gesperrt ohne Freigabe |

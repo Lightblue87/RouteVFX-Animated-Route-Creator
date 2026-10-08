@@ -38,6 +38,6 @@ docs/            Entscheidungen, Risiken, Nachweise, Kosten, Abnahme, Fortschrit
 ```
 
 ## Daten & Lizenzen
-- Kartendaten: [Natural Earth](https://www.naturalearthdata.com/) (gemeinfrei)
+- Kartendaten: [Natural Earth](https://www.naturalearthdata.com/) (gemeinfrei); optional Detailkarte über [OpenFreeMap](https://openfreemap.org) – „OpenFreeMap © OpenMapTiles Data from OpenStreetMap“ (Stile Positron/Dark Matter: BSD-3, Design CC BY 4.0; Lizenzen in `src/adapters/maps/openfreemap/LICENSE.md`)
 - Bibliotheken: siehe `docs/EXTERNAL_EVIDENCE.md`
 - Logos in `assets/logos/`: Eigentum des Repository-Owners

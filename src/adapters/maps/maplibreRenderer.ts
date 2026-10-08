@@ -1,12 +1,14 @@
 import './setup';
-import { Map as MlMap } from 'maplibre-gl';
+import { Map as MlMap, type ErrorEvent } from 'maplibre-gl';
 import { LOGICAL_VIEWPORT, type CameraState, type SceneState } from '../../core/scene/evaluate';
 import { drawOverlay, type OverlayOptions } from '../../scene/drawOverlay';
-import { buildStyle } from './styles';
+import { buildStyle, type LabelLang } from './styles';
 
 export interface RendererOptions {
   container: HTMLElement;
   styleId: string;
+  /** Sprache der Kartenbeschriftung (Detailkarte). */
+  lang: LabelLang;
   /** Ausgabe-Pixel je logischem Pixel. 2 → 1080×1920, 4 → 2160×3840. */
   pixelRatio: number;
   interactive: boolean;
@@ -28,7 +30,7 @@ export class MapLibreSceneRenderer {
     el.style.height = `${LOGICAL_VIEWPORT.height}px`;
     this.map = new MlMap({
       container: el,
-      style: buildStyle(opts.styleId, document.baseURI),
+      style: buildStyle(opts.styleId, document.baseURI, opts.lang),
       center: [10, 50],
       zoom: 3,
       pixelRatio: opts.pixelRatio,
@@ -42,7 +44,15 @@ export class MapLibreSceneRenderer {
     });
     this.ready = new Promise((resolve, reject) => {
       this.map.once('load', () => resolve());
-      this.map.once('error', (e) => reject(e.error ?? new Error('map error')));
+      // Nur Fehler des Stils selbst sind fatal. Fehler einzelner Quellen (z. B. Online-Kacheln) dürfen die
+      // Karte nicht blockieren: Natural Earth darunter bleibt nutzbar.
+      const onError = (e: ErrorEvent & { sourceId?: string }) => {
+        if (e.sourceId) return;
+        this.map.off('error', onError);
+        reject(e.error ?? new Error('map error'));
+      };
+      this.map.on('error', onError);
+      this.map.once('load', () => this.map.off('error', onError));
     });
   }
 
@@ -52,7 +62,7 @@ export class MapLibreSceneRenderer {
 
   setStyle(styleId: string): void {
     this.opts.styleId = styleId;
-    this.map.setStyle(buildStyle(styleId, document.baseURI));
+    this.map.setStyle(buildStyle(styleId, document.baseURI, this.opts.lang));
   }
 
   applyCamera(c: CameraState): void {
