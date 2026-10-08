@@ -13,6 +13,11 @@ export interface ProjectApi {
   project: Project;
   /** Änderung mit Undo-Eintrag. */
   commit: (next: Project | ((p: Project) => Project)) => void;
+  /**
+   * Abgeleitete Änderung (z. B. automatisch berechnete Segmente) ohne eigenen Undo-Eintrag: Sie gehört zur
+   * auslösenden Nutzeraktion. Undo stellt den Stand davor her, Redo den Stand inklusive Ableitung.
+   */
+  commitDerived: (next: (p: Project) => Project) => void;
 }
 
 const HISTORY_LIMIT = 50;
@@ -90,6 +95,10 @@ export function Editor({ projectId, close }: { projectId: string; close: () => v
     force((x) => x + 1);
   }, []);
 
+  const commitDerived = useCallback((next: (p: Project) => Project) => {
+    setProject((cur) => (cur ? next(cur) : cur));
+  }, []);
+
   const undo = () => {
     const prev = past.current.pop();
     if (!prev || !project) return;
@@ -113,7 +122,7 @@ export function Editor({ projectId, close }: { projectId: string; close: () => v
   }
   if (!project) return <div className="screen center" aria-busy="true">…</div>;
 
-  const api: ProjectApi = { project, commit };
+  const api: ProjectApi = { project, commit, commitDerived };
   const saveLabel = { saved: t('common.saved'), saving: t('common.saving'), error: t('common.saveError'), quota: t('common.quotaError') }[save];
 
   return (

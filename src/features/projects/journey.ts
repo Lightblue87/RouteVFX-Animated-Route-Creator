@@ -102,6 +102,31 @@ export async function changeSegmentMode(p: Project, segId: string, mode: Transpo
   return { base: old, segment: seg, notices, usedOnline: usage.online };
 }
 
+/** Vermerkt im Projekt, dass Daten an einen Online-Dienst übertragen wurden. */
+export function markOnlineUsed(p: Project): Project {
+  return p.privacy.usedOnlineServices ? p : { ...p, privacy: { usedOnlineServices: true } };
+}
+
+/**
+ * Merkt sich je Abschnitt die zuletzt angeforderte Verkehrsmittel-Berechnung. Antworten älterer Anfragen
+ * werden verworfen – unabhängig davon, in welcher Reihenfolge die Antworten eintreffen.
+ */
+export class LatestRequestGate {
+  private seq = 0;
+  private readonly latest = new Map<string, number>();
+  begin(key: string): number {
+    const token = ++this.seq;
+    this.latest.set(key, token);
+    return token;
+  }
+  isLatest(key: string, token: number): boolean {
+    return this.latest.get(key) === token;
+  }
+  end(key: string, token: number): void {
+    if (this.isLatest(key, token)) this.latest.delete(key);
+  }
+}
+
 /**
  * Ersetzt `base` durch `next`, aber nur wenn `base` im aktuellen Projekt noch unverändert ist.
  * Wurde der Abschnitt inzwischen bearbeitet, entfernt oder neu berechnet, gewinnt die spätere Nutzeraktion.

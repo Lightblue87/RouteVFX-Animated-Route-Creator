@@ -5,7 +5,7 @@ import { PlannerMap } from './PlannerMap';
 import { loadAirports, loadPlaces, searchNominatim, searchOffline, type Place } from '../adapters/geocoding';
 import { createOsrmProvider } from '../adapters/routing/osrm';
 import type { RoutingSettings } from '../adapters/routing/registry';
-import { addStop, applyControlPoints, appendGpxTrack, controlPointsOf, changeSegmentMode, fillMissingSegments, missingPairs, moveStop, normalizeSegments, replaceSegmentIfUnchanged, removeStop, updateSegment, updateStop } from '../features/projects/journey';
+import { addStop, applyControlPoints, appendGpxTrack, controlPointsOf, changeSegmentMode, LatestRequestGate, markOnlineUsed, fillMissingSegments, missingPairs, moveStop, normalizeSegments, replaceSegmentIfUnchanged, removeStop, updateSegment, updateStop } from '../features/projects/journey';
 import { GPX_MAX_BYTES, GpxError, parseGpx } from '../features/imports/gpx';
 import { TRANSPORT_MODES, type GeoPoint, type TransportMode } from '../core/types';
 import { formatKm, type MessageKey } from '../i18n';
@@ -25,7 +25,7 @@ export function useOnlineSetting(): [boolean, (v: boolean) => void] {
 
 export function RoutePanel({ api }: { api: ProjectApi }) {
   const { t, locale } = useI18n();
-  const { project, commit } = api;
+  const { project, commit, commitDerived } = api;
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Place[]>([]);
   const [notices, setNotices] = useState<string[]>([]);
@@ -62,7 +62,7 @@ export function RoutePanel({ api }: { api: ProjectApi }) {
   useEffect(() => {
     const orphan = project.journey.segments.length > Math.max(0, project.journey.stops.length - 1);
     if (orphan && missingPairs(project).length === 0) {
-      commit((cur) => normalizeSegments(cur));
+      commitDerived((cur) => normalizeSegments(cur));
       return;
     }
     if (missingPairs(project).length === 0 || pending.current) return;
@@ -72,7 +72,7 @@ export function RoutePanel({ api }: { api: ProjectApi }) {
       .then(({ project: p, notices: n }) => {
         // In den aktuellen Zustand einmischen (Nutzer kann während der Berechnung weiter editieren).
         const fresh = p.journey.segments.filter((s) => !project.journey.segments.includes(s));
-        commit((cur) =>
+        commitDerived((cur) =>
           normalizeSegments({
             ...cur,
             privacy: p.privacy.usedOnlineServices ? { usedOnlineServices: true } : cur.privacy,
@@ -122,23 +122,27 @@ export function RoutePanel({ api }: { api: ProjectApi }) {
       }
       if (tracks.length) commit((p) => tracks.reduce((acc, tr) => appendGpxTrack(acc, tr), p));
       setMessage(t('route.gpxImported', { n: tracks.length }));
+      setNotices(res.warnings);
     } catch (e) {
       setMessage(t('route.gpxError', { reason: e instanceof GpxError ? e.code : 'invalid' }));
     }
   };
 
+  const modeGate = useRef(new LatestRequestGate()).current;
   const setMode = async (segId: string, mode: TransportMode) => {
     setBusy(true);
+    const token = modeGate.begin(segId);
     try {
       const r = await changeSegmentMode(project, segId, mode, settings);
       if (!r) return;
-      commit((cur) => {
-        const next = replaceSegmentIfUnchanged(cur, r.base, r.segment);
-        // Die Übertragung hat stattgefunden, auch wenn das Ergebnis verworfen wird.
-        return r.usedOnline && !next.privacy.usedOnlineServices ? { ...next, privacy: { usedOnlineServices: true } } : next;
-      });
+      // Die Übertragung hat stattgefunden, auch wenn das Ergebnis gleich verworfen wird.
+      if (r.usedOnline) commitDerived(markOnlineUsed);
+      // Eine spätere Auswahl für denselben Abschnitt gewinnt, egal in welcher Reihenfolge die Antworten eintreffen.
+      if (!modeGate.isLatest(segId, token)) return;
+      commit((cur) => replaceSegmentIfUnchanged(cur, r.base, r.segment));
       setNotices(r.notices);
     } finally {
+      modeGate.end(segId, token);
       setBusy(false);
     }
   };

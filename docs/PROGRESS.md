@@ -33,8 +33,9 @@
 
 ### Testergebnisse dieses Schritts
 - `npm run typecheck`: ohne Fehler.
-- `npx vitest run`: **9 Dateien, 62 Tests bestanden.**
+- `npx vitest run`: **9 Dateien, 68 Tests bestanden** (Stand nach Review-Korrekturen 2026-10-08).
 - `npx playwright test` (Chrome for Testing 141, Pixel-7-Emulation, SwiftShader): **14 E2E-Tests bestanden** – Export 1080p30/1080p60/4k30/4k60 (je ffprobe-geprüft), Reload-Persistenz, GPX-UI inkl. Ablehnung, Exportabbruch, Szenario 2 (multimodales Video), Linienkorrektur, Offline-Start, Autosave-Flush, langsam ladende Karte, Duplizieren inkl. Medienkopie.
+- Review-Korrekturen 2026-10-08 (Undo-Gruppierung, Moduswechsel-Reihenfolge, GPX-Lücken, Fade-Begrenzung, Datenschutz-Flag, Blob-Freigabe): Nicht-Export-E2E (8 Tests inkl. neuem Undo/Redo-Test) mit Playwright-Chromium 1194 in der Sandbox bestanden; **Export-E2E in dieser Runde nicht erneut ausgeführt** (Chrome for Testing mit H.264 in dieser Sitzung nicht verfügbar). Der Offline-Test schlug in einem von vier Gesamtläufen einmal fehl (Moduswechsel nach Reload nicht gespeichert), isoliert 10/10 bestanden – Ursache nicht geklärt, als offenes Risiko geführt.
 - `npm audit --audit-level=high`: 0 Funde.
 
 ### Bekannte kleine Mängel (offen)

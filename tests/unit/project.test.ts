@@ -109,3 +109,30 @@ describe('Fade-Eingabe', async () => {
     }
   });
 });
+
+describe('Konkurrierende Moduswechsel: letzte Auswahl gewinnt', async () => {
+  const { changeSegmentMode, replaceSegmentIfUnchanged, LatestRequestGate } = await import('../../src/features/projects/journey');
+  // Simuliert RoutePanel.setMode: Antwort nur übernehmen, wenn sie zur letzten Anfrage des Abschnitts gehört.
+  async function run(order: 'first-then-second' | 'second-then-first') {
+    const p = await multimodalProject();
+    const seg = p.journey.segments[0]!;
+    const gate = new LatestRequestGate();
+    const tWalk = gate.begin(seg.id);
+    const walk = (await changeSegmentMode(p, seg.id, 'walk', { onlineAllowed: false }))!;
+    const tBike = gate.begin(seg.id);
+    const bike = (await changeSegmentMode(p, seg.id, 'bike', { onlineAllowed: false }))!;
+    const answers = order === 'first-then-second' ? [[walk, tWalk], [bike, tBike]] as const : [[bike, tBike], [walk, tWalk]] as const;
+    let cur = p;
+    for (const [r, token] of answers) {
+      if (gate.isLatest(seg.id, token)) cur = replaceSegmentIfUnchanged(cur, r.base, r.segment);
+      gate.end(seg.id, token);
+    }
+    return cur.journey.segments[0]!.mode;
+  }
+  it('walk then bike requested, answers in request order → bike', async () => {
+    expect(await run('first-then-second')).toBe('bike');
+  });
+  it('walk then bike requested, answers in reverse order → bike', async () => {
+    expect(await run('second-then-first')).toBe('bike');
+  });
+});

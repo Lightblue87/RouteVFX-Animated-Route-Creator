@@ -83,12 +83,18 @@ export function parseGpx(text: string, byteLength = new TextEncoder().encode(tex
 
   for (const trk of Array.from(doc.getElementsByTagName('trk'))) {
     const name = sanitizeLabel(childText(trk, 'name')) || 'Track';
+    // Jedes <trkseg> bleibt ein eigener Track: Aufzeichnungslücken werden nicht als gefahrene Strecke verbunden.
     const segs = Array.from(trk.getElementsByTagName('trkseg'));
-    if (segs.length > 1) warnings.add('multiple_segments_joined');
-    const pts = segs.flatMap((s) => Array.from(s.getElementsByTagName('trkpt')));
-    guard(pts.length);
-    const points = pts.map((e) => pointFrom(e, warnings)).filter((p): p is GeoPoint => p !== null);
-    if (points.length >= 2) tracks.push(trackFrom(name, points));
+    const parts: GeoPoint[][] = [];
+    for (const s of segs) {
+      const pts = Array.from(s.getElementsByTagName('trkpt'));
+      guard(pts.length);
+      const points = pts.map((e) => pointFrom(e, warnings)).filter((p): p is GeoPoint => p !== null);
+      if (points.length >= 2) parts.push(points);
+      else if (pts.length > 0) warnings.add('track_segment_too_short');
+    }
+    if (parts.length > 1) warnings.add('track_gaps_kept');
+    parts.forEach((points, i) => tracks.push(trackFrom(parts.length > 1 ? `${name} (${i + 1}/${parts.length})` : name, points)));
   }
   for (const rte of Array.from(doc.getElementsByTagName('rte'))) {
     const name = sanitizeLabel(childText(rte, 'name')) || 'Route';

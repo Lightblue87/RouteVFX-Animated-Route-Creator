@@ -16,15 +16,26 @@ const TRK = `<?xml version="1.0" encoding="UTF-8"?>
 </gpx>`;
 
 describe('GPX import', () => {
-  it('parses tracks with multiple segments, elevation and real times', () => {
+  it('parses tracks with elevation and real times; single-point sections are skipped with a warning', () => {
     const r = parseGpx(TRK);
     expect(r.tracks).toHaveLength(1);
     const t = r.tracks[0]!;
-    expect(t.points).toHaveLength(3);
+    expect(t.points).toHaveLength(2);
     expect(t.points[0]!.altitudeM).toBe(55);
-    expect(t.durationS).toBe(600);
+    expect(t.durationS).toBe(300);
     expect(r.waypoints[0]!.name).toBe('Start');
-    expect(r.warnings).toContain('multiple_segments_joined');
+    expect(r.warnings).toContain('track_segment_too_short');
+  });
+  it('keeps spatially separated <trkseg> apart instead of counting the gap as travelled distance', () => {
+    const gpx = `<gpx version="1.1" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>Lücke</name>
+      <trkseg><trkpt lat="52.000" lon="9.000"/><trkpt lat="52.010" lon="9.000"/></trkseg>
+      <trkseg><trkpt lat="41.000" lon="2.000"/><trkpt lat="41.010" lon="2.000"/></trkseg>
+    </trk></gpx>`;
+    const r = parseGpx(gpx);
+    expect(r.tracks).toHaveLength(2);
+    expect(r.tracks.map((t) => t.name)).toEqual(['Lücke (1/2)', 'Lücke (2/2)']);
+    for (const t of r.tracks) expect(t.distanceM).toBeLessThan(1_200);
+    expect(r.warnings).toContain('track_gaps_kept');
   });
   it('keeps markup in names as inert text (no HTML interpretation)', () => {
     expect(parseGpx(TRK).tracks[0]!.name).toBe('Tour <script>alert(1)</script>');

@@ -91,3 +91,24 @@ test('Projekt duplizieren und Original löschen – Kopie bleibt erhalten', asyn
   await expect(page.getByText('Original (2)')).toBeVisible();
   await expect(page.getByRole('listitem')).toHaveCount(1);
 });
+
+test('Undo nach Stopp hinzufügen nimmt Stopp und berechnetes Segment gemeinsam zurück; Redo stellt beides her', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('create-project').click();
+  await addPlace(page, 'Hannover', /Hannover|Hanover/);
+  await addPlace(page, 'Barcelona', /Barcelona/);
+  await expect(page.getByTestId('segment')).toHaveCount(1);
+  await addPlace(page, 'Palma', /Palma/);
+  await expect(page.getByTestId('segment')).toHaveCount(2);
+  const undo = page.getByRole('button', { name: /Rückgängig|Undo/ });
+  const redo = page.getByRole('button', { name: /Wiederholen|Redo/ });
+  await undo.click();
+  await expect(page.getByTestId('segment')).toHaveCount(1);
+  await expect(redo).toBeEnabled();
+  // Kein erneutes automatisches Berechnen, das die Redo-Historie löscht
+  await page.waitForTimeout(500);
+  await expect(page.getByTestId('segment')).toHaveCount(1);
+  await expect(redo).toBeEnabled();
+  await redo.click();
+  await expect(page.getByTestId('segment')).toHaveCount(2);
+});
