@@ -108,3 +108,33 @@ test('Hinweis-Karte: Straßenroute per Knopf, konkrete Fehlerursache, erneuter V
   await page.getByTestId('tab-animate').click();
   await expect(kind).toHaveValue('full');
 });
+
+test('Widerruf der Einwilligung stoppt eine laufende Sammelberechnung', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('create-project').click();
+  const toggle = page.getByTestId('online-toggle');
+  test.skip(!/Supabase/.test((await toggle.locator('..').textContent()) ?? ''), 'Build ohne VITE_ROUTING_PROXY_URL');
+
+  let calls = 0;
+  await page.context().route(PROXY, async (route) => {
+    const req = route.request();
+    const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'content-type' };
+    if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
+    calls++;
+    await new Promise((r) => setTimeout(r, 1500)); // erste Antwort verzögern, Widerruf während des Fluges
+    const [a, b] = req.postDataJSON().coordinates as number[][];
+    return route.fulfill({ status: 200, headers: cors, json: { routes: [{ coordinates: [a, b], distanceM: 1000, durationS: 60 }], attribution: ATTRIBUTION } });
+  });
+
+  await addPlace(page, 'Hannover', /Hannover|Hanover/);
+  await addPlace(page, 'Braunschweig', /Braunschweig/);
+  await addPlace(page, 'Bielefeld', /Bielefeld/);
+  await expect(page.getByTestId('segment')).toHaveCount(2);
+  expect(calls).toBe(0);
+
+  await toggle.check();
+  await expect.poll(() => calls).toBe(1);
+  await toggle.uncheck();
+  await page.waitForTimeout(3500); // genug Zeit für eine zweite Anfrage (Drosselung 1/s + Antwort)
+  expect(calls).toBe(1);
+});

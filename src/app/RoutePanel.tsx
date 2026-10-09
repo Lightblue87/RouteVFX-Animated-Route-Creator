@@ -33,7 +33,13 @@ export function RoutePanel({ api }: { api: ProjectApi }) {
   const [notices, setNotices] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [online, setOnline] = useOnlineSetting();
+  const [online, setOnlineState] = useOnlineSetting();
+  // Aktuelle Einwilligung, auch für laufende Sammelberechnungen: ein Widerruf stoppt weitere Übertragungen sofort.
+  const consent = useRef(online);
+  const setOnline = (v: boolean) => {
+    consent.current = v;
+    setOnlineState(v);
+  };
   const settings: RoutingSettings = useMemo(() => ({ onlineAllowed: online, online: onlineRouting }), [online]);
   const fileRef = useRef<HTMLInputElement>(null);
   const [editId, setEditId] = useState<string | null>(null);
@@ -162,6 +168,7 @@ export function RoutePanel({ api }: { api: ProjectApi }) {
       const all: string[] = [];
       let used = false;
       for (const seg of estimatedRoad) {
+        if (!consent.current) break;
         const r = await changeSegmentMode(project, seg.id, seg.mode, allowed);
         if (!r) continue;
         used ||= r.usedOnline;
