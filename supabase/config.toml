@@ -1,0 +1,8 @@
+# Supabase-Projekt „RouteVFX“ (getrennt von anderen Projekten des Kontos).
+# Nur die Teile, die dieses Repository nutzt: Edge Function „route“ (Routing-Proxy zu openrouteservice).
+project_id = "routevfx"
+
+[functions.route]
+# Öffentlich aufrufbar ohne Supabase-Login (V1 hat keine Konten). Schutz: Origin-Allowlist, Tages-Kontingente
+# je Client und gesamt (Datenbank), Kill-Switch per Secret ROUTING_ENABLED.
+verify_jwt = false

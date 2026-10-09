@@ -1,12 +1,13 @@
 /// <reference types="vitest/config" />
-import { defineConfig, type Plugin } from 'vite';
+import { defineConfig, loadEnv, type Plugin } from 'vite';
 import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import react from '@vitejs/plugin-react';
+import { proxyOrigin } from './src/adapters/routing/proxyOrigin.ts';
 
 // Strikte CSP nur im Produktions-Build (Dev-Server benötigt Inline-Skripte für HMR).
-const CSP = [
+const buildCsp = (routingProxy: string | null) => [
   "default-src 'self'",
   "script-src 'self'",
   "style-src 'self' 'unsafe-inline'",
@@ -14,16 +15,17 @@ const CSP = [
   "img-src 'self' data: blob: https://tiles.openfreemap.org",
   "media-src 'self' blob:",
   "worker-src 'self' blob:",
-  "connect-src 'self' https://routing.openstreetmap.de https://nominatim.openstreetmap.org https://tiles.openfreemap.org",
+  // Routing-Proxy (Supabase Edge Function), falls VITE_ROUTING_PROXY_URL gesetzt ist; sonst FOSSGIS-OSRM-Prototyp
+  `connect-src 'self' https://routing.openstreetmap.de https://nominatim.openstreetmap.org https://tiles.openfreemap.org${routingProxy ? ` ${routingProxy}` : ''}`,
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'none'",
 ].join('; ');
 
-const cspPlugin = (): Plugin => ({
+const cspPlugin = (csp: string): Plugin => ({
   name: 'csp-meta',
   apply: 'build',
-  transformIndexHtml: (html) => html.replace('<meta charset="UTF-8" />', `<meta charset="UTF-8" />\n    <meta http-equiv="Content-Security-Policy" content="${CSP}" />`),
+  transformIndexHtml: (html) => html.replace('<meta charset="UTF-8" />', `<meta charset="UTF-8" />\n    <meta http-equiv="Content-Security-Policy" content="${csp}" />`),
 });
 
 // Trägt alle gehashten Bundles in den Precache des Service Workers ein (Offline-Start nach Erstinstallation).
@@ -49,13 +51,13 @@ const swPrecachePlugin = (): Plugin => {
   };
 };
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   base: './',
-  plugins: [react(), cspPlugin(), swPrecachePlugin()],
+  plugins: [react(), cspPlugin(buildCsp(proxyOrigin(loadEnv(mode, process.cwd(), 'VITE_').VITE_ROUTING_PROXY_URL))), swPrecachePlugin()],
   build: { target: 'es2022', sourcemap: true, chunkSizeWarningLimit: 1500 },
   worker: { format: 'es' },
   test: {
     environment: 'jsdom',
     include: ['tests/unit/**/*.test.ts', 'tests/integration/**/*.test.ts', 'tests/contracts/**/*.test.ts'],
   },
-});
+}));

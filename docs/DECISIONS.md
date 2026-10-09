@@ -55,12 +55,17 @@ Audio: AAC über WebCodecs `AudioEncoder`; **in der Sandbox nicht verfügbar** (
 | Modus | Quelle | Vertrauensstufe |
 |---|---|---|
 | Flug | lokal, Großkreis | `derived` |
-| Auto/Motorrad/Rad/Fuß | OSRM (FOSSGIS-Demoserver) **nur nach Opt-in**; sonst lokale Näherung | `provider_verified` bzw. `estimated` |
+| Auto/Motorrad/Rad/Fuß | **openrouteservice über eigenen Supabase-Proxy** (wenn `VITE_ROUTING_PROXY_URL` gesetzt), sonst OSRM (FOSSGIS-Demoserver) als Prototyp – beides **nur nach Opt-in**; sonst lokale Näherung | `provider_verified` bzw. `estimated` |
 | Schiff, Bahn, Bus | keine lizenzierte Datenquelle → lokale Näherung | `estimated` + Warnung |
 
 Begründung: Kein kostenloser, für öffentliche Produktionsnutzung bestätigter Routingdienst gefunden (E05). Der FOSSGIS-Server ist ein Best-Effort-Demodienst; Bedingungen konnten in dieser Sitzung nicht abgerufen werden. Deshalb Opt-in, Drosselung (1 Anfrage/s) und gekennzeichneter Fallback. Ausstiegspfad: openrouteservice/GraphHopper (Free-Tier mit Schlüssel – Bedingungen prüfen) oder selbst gehostetes OSRM/Valhalla (Kosten → Freigabe nötig).
 
-**Produktentscheidung 2026-10-08 (Produktverantwortlicher):** Für den öffentlichen Betrieb wird ein **Routinganbieter mit kostenlosem Kontingent und API-Schlüssel** verwendet (Kandidaten: openrouteservice, GraphHopper). Bedingungen: kein kostenpflichtiger Tarif, keine Kreditkartenpflicht ohne erneute Freigabe; Nutzungsbedingungen (Persistenz der Geometrie, Attribution, kommerzielle/öffentliche Nutzung, Schlüssel im Client vs. Proxy) und Limits werden vor Auswahl in `EXTERNAL_EVIDENCE.md` (E05/E12) belegt; harte Drosselung und Kill-Switch. FOSSGIS-OSRM bleibt bis dahin nur Opt-in-Prototyp und wird vor öffentlichem Start ersetzt. Status: `Anforderung` – Umsetzung in einem Folge-PR.
+**Produktentscheidung 2026-10-08 (Produktverantwortlicher):** Für den öffentlichen Betrieb wird ein **Routinganbieter mit kostenlosem Kontingent und API-Schlüssel** verwendet (Kandidaten: openrouteservice, GraphHopper). Bedingungen: kein kostenpflichtiger Tarif, keine Kreditkartenpflicht ohne erneute Freigabe; Nutzungsbedingungen (Persistenz der Geometrie, Attribution, kommerzielle/öffentliche Nutzung, Schlüssel im Client vs. Proxy) und Limits werden vor Auswahl in `EXTERNAL_EVIDENCE.md` (E05/E12) belegt; harte Drosselung und Kill-Switch. FOSSGIS-OSRM bleibt bis dahin nur Opt-in-Prototyp und wird vor öffentlichem Start ersetzt.
+
+**Umsetzung 2026-10-08:** openrouteservice (Standard-Plan, kostenlos). Die ORS-FAQ verbietet den Schlüssel im Client; deshalb ein Proxy. Auf Wunsch des Produktverantwortlichen als **Supabase Edge Function** (`supabase/functions/route`), weil Login/Nutzerdatenbank (Phase 6) ohnehin dort entstehen sollen. Alternativen: Cloudflare Worker (keine Pausierung, aber zweiter Dienst); Schlüssel je Nutzer (keine Infrastruktur, aber Hürde für Nutzer).
+- Schutz: Origin-Allowlist, Kill-Switch (`ROUTING_ENABLED`), Tages-Kontingente je Client (täglich wechselnder, gesalzener IP-Hash) und gesamt (1.800 < ORS-Limit 2.000) sowie ein gleitendes Minutenlimit gesamt (30 < ORS-Limit 40, nur Zeitstempel in `routing_recent`) in Postgres (`routing_take_quota`, nur Service-Rolle), fail-closed bei DB-Fehler, Body ≤ 4 KB, 2–5 Punkte. Keine Speicherung/Protokollierung von Koordinaten.
+- Client: `createOrsProxyProvider` (`src/adapters/routing/orsProxy.ts`), Auswahl in `config.ts`; Fehler → gekennzeichnete Näherung wie bisher. CSP erhält den https-Origin des Proxys zur Build-Zeit.
+- Status: **Implementiert**, in der Sandbox getestet (Handler, Deno-Lauf mit simulierter DB, SQL in PGlite). **Nicht** gegen echtes Supabase/ORS getestet; Einrichtung durch den Produktverantwortlichen nach `docs/SUPABASE_ROUTING.md`.
 
 ## ADR-005 Geocoding
 
@@ -69,6 +74,8 @@ Offline-Suche über Natural Earth Populated Places (7.342 Orte inkl. deutscher N
 ## ADR-006 Lokale Persistenz
 
 IndexedDB über `idb` 8.0.4 (ISC). Projekte als Zod-validiertes JSON (`schemaVersion`), Medien getrennt als Blobs. Validierung beim Lesen **und** vor dem Schreiben; defekte Datensätze werden gemeldet, nie gelöscht. `navigator.storage.persist()` wird beim ersten Projekt angefragt.
+
+**Schreib-Journal (2026-10-09):** Ein E2E-Lauf unter Last deckte einen echten Datenverlust auf: Nach „Zurück“ plus sofortigem Reload/Schließen wurde die noch offene IndexedDB-Transaktion abgebrochen, die letzte Änderung fehlte (per Instrumentierung belegt: `put start`, nie `put done`). Deshalb sichert der Editor den noch nicht bestätigten Stand beim Verlassen zusätzlich **synchron** in `localStorage` (`src/adapters/storage/journal.ts`, nur Projekt-JSON, keine Blobs, ≤ 2 MB). Der nächste Seitenstart spielt es vor dem ersten Lesen ein (`recoverJournals`, einmal je Seitenstart): nur wenn das Projekt noch existiert und nicht neuer gespeichert wurde; gelöschte Projekte werden nie wiederbelebt; bei Speicherfehlern bleibt das Journal erhalten. Nach bestätigtem Schreiben wird es entfernt (nur bei identischem Stand). Grenze: Stürzt der Browser ab, bevor `localStorage` auf Datenträger geschrieben wurde, bleibt ein Restrisiko; ohne `localStorage` (blockiert/voll) gilt weiter nur der IndexedDB-Pfad.
 
 ## ADR-007 Deterministische Szene
 

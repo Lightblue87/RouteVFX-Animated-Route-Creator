@@ -33,7 +33,7 @@ export const de = {
   'route.down': 'Nach unten',
   'route.alternative': 'Alternative {n}',
   'route.recompute': 'Neu berechnen',
-  'route.onlineToggle': 'Online-Dienste erlauben (Routing: FOSSGIS-OSRM, Suche: Nominatim). Dabei werden Ortskoordinaten bzw. Suchbegriffe an diese Anbieter übertragen.',
+  'route.onlineToggle': 'Online-Dienste erlauben (Routing: {router}, Suche: Nominatim). Dabei werden Ortskoordinaten bzw. Suchbegriffe an diese Anbieter übertragen.',
   'route.offlineBadge': 'Offline-Daten',
   'route.total': 'Gesamt: {km}',
   'route.gpxError': 'GPX konnte nicht gelesen werden: {reason}',

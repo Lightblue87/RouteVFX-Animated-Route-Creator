@@ -2,6 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useI18n } from './App';
 import type { Project } from '../core/project/schema';
 import { loadProject, pruneUnreferencedBlobs, saveProject, StorageError } from '../adapters/storage/idb';
+import { journalClearIfSame, journalWrite } from '../adapters/storage/journal';
 import { RoutePanel } from './RoutePanel';
 import { AnimatePanel } from './AnimatePanel';
 const ExportPanel = lazy(() => import('./ExportPanel').then((m) => ({ default: m.ExportPanel })));
@@ -48,14 +49,22 @@ export function Editor({ projectId, close }: { projectId: string; close: () => v
   const firstLoad = useRef(true);
   const pending = useRef<Project | null>(null);
   const persist = useCallback((p: Project) => {
-    if (pending.current === p) pending.current = null;
+    // Der Stand bleibt „ausstehend“, bis das Schreiben bestätigt ist: Wird die Seite währenddessen ausgeblendet oder
+    // geschlossen, oder schlägt das Schreiben fehl, sichert flush() ihn weiterhin im Journal.
     return saveProject(p)
-      .then(() => setSave('saved'))
+      .then(() => {
+        if (pending.current === p) pending.current = null;
+        journalClearIfSame(p);
+        setSave('saved');
+      })
       .catch((e) => setSave(e instanceof StorageError && e.code === 'quota' ? 'quota' : 'error'));
   }, []);
   const flush = useCallback(() => {
     const p = pending.current;
-    if (p) void persist(p);
+    if (!p) return;
+    // Synchrone Sicherung: überlebt Reload/Schließen, auch wenn die asynchrone IndexedDB-Transaktion abgebrochen wird.
+    journalWrite(p);
+    void persist(p);
   }, [persist]);
 
   useEffect(() => {

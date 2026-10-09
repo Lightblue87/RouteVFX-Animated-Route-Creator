@@ -112,3 +112,65 @@ test('Undo nach Stopp hinzufügen nimmt Stopp und berechnetes Segment gemeinsam 
   await redo.click();
   await expect(page.getByTestId('segment')).toHaveCount(2);
 });
+
+test('Autosave: Speichern wird beim Verlassen abgebrochen (Reload) – Änderung kommt aus dem Journal zurück', async ({ page }) => {
+  // Simuliert den Abbruch der noch offenen IndexedDB-Transaktion beim Neuladen: Der erste Schreibvorgang mit dem
+  // neuen Titel wird verschluckt (kein Erfolg, kein Fehler). Ohne synchrones Journal wäre die Änderung verloren.
+  await page.addInitScript(() => {
+    if (sessionStorage.getItem('swallowed')) return; // nach dem Reload nicht erneut verschlucken
+    let done = false;
+    const orig = IDBObjectStore.prototype.put;
+    IDBObjectStore.prototype.put = function (this: IDBObjectStore, value: unknown, key?: IDBValidKey) {
+      if (!done && this.name === 'projects' && (value as { title?: string }).title === 'Sofort zurück') {
+        done = true;
+        sessionStorage.setItem('swallowed', '1');
+        return new Promise(() => {}) as unknown as IDBRequest; // Anfrage, die nie abgeschlossen wird (idb awaitet sie)
+      }
+      return orig.call(this, value, key);
+    };
+  });
+  await page.goto('/');
+  await page.getByTestId('create-project').click();
+  await page.getByTestId('tab-animate').click();
+  await page.getByTestId('title-input').evaluate((el: HTMLInputElement) => {
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
+    setter.call(el, 'Sofort zurück');
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    setTimeout(() => (location.hash = ''), 0);
+  });
+  await expect(page.getByTestId('create-project')).toBeVisible();
+  await expect.poll(() => page.evaluate(() => sessionStorage.getItem('swallowed'))).toBe('1');
+  expect(await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('arc.journal.v1.')).length)).toBe(1);
+  await page.reload();
+  await expect(page.getByText('Sofort zurück')).toBeVisible();
+  // eingespielt und Journal aufgeräumt; auch nach weiterem Reload vorhanden
+  await expect.poll(() => page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('arc.journal.v1.')).length)).toBe(0);
+  await page.reload();
+  await expect(page.getByText('Sofort zurück')).toBeVisible();
+});
+
+test('Autosave: Seite wird beendet, während das verzögerte Speichern noch läuft – Journal sichert den Stand', async ({ page }) => {
+  // Das Speichern nach dem 500-ms-Debounce hängt (wird nie bestätigt), dann verlässt der Nutzer den Editor und lädt neu.
+  await page.addInitScript(() => {
+    if (sessionStorage.getItem('swallowed')) return; // nach dem Reload normal speichern
+    const orig = IDBObjectStore.prototype.put;
+    IDBObjectStore.prototype.put = function (this: IDBObjectStore, value: unknown, key?: IDBValidKey) {
+      if (this.name === 'projects' && (value as { title?: string }).title === 'Läuft noch') {
+        sessionStorage.setItem('swallowed', '1'); // in diesem Seitenleben bleiben alle Schreibvorgänge dieses Stands offen
+        return new Promise(() => {}) as unknown as IDBRequest;
+      }
+      return orig.call(this, value, key);
+    };
+  });
+  await page.goto('/');
+  await page.getByTestId('create-project').click();
+  await page.getByTestId('tab-animate').click();
+  await page.getByTestId('title-input').fill('Läuft noch');
+  await expect.poll(() => page.evaluate(() => sessionStorage.getItem('swallowed')), { timeout: 10_000 }).toBe('1'); // Debounce hat ausgelöst, Schreiben hängt
+  await page.getByRole('button', { name: /Zurück|Back/ }).click();
+  await expect(page.getByTestId('create-project')).toBeVisible();
+  expect(await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('arc.journal.v1.')).length)).toBe(1);
+  await page.reload();
+  await expect(page.getByText('Läuft noch')).toBeVisible();
+});
+

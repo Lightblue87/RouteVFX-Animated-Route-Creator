@@ -11,7 +11,7 @@ Stand: 2026-10-08. Grundsatz: **Nullkosten beim Start**. Keine kostenpflichtigen
 | Geocoding | Offline-Suche (Natural Earth) | 0 € | – |
 | Geocoding online (Opt-in) | Nominatim (OSMF) | 0 €, aber Fair-Use-Richtlinie | Sperrung der IP bei Missbrauch → Fallback offline |
 | Routing | Lokal (Großkreis/Näherung) | 0 € | – |
-| Routing online (Opt-in) | FOSSGIS-OSRM-Demo | 0 €, Best-Effort | Sperrung/Ausfall → gekennzeichneter Fallback |
+| Routing online (Opt-in) | openrouteservice über Supabase Edge Function (wenn eingerichtet), sonst FOSSGIS-OSRM-Demo | 0 €: ORS Standard 2.000/Tag; Supabase Free 500.000 Aufrufe/Monat; Proxy begrenzt auf 1.800/Tag gesamt, 50/Client | Kontingent erschöpft/Projekt pausiert/Kill-Switch → gekennzeichneter Fallback; kein Pay-as-you-go |
 | Video-Encoding | Auf dem Gerät des Nutzers (WebCodecs) | 0 € serverseitig | Gerätelast beim Nutzer |
 | Speicher | IndexedDB auf dem Gerät | 0 € | Browser-Quota des Nutzers |
 | Hosting | **noch keines** (nicht veröffentlicht) | – | – |
@@ -28,7 +28,7 @@ Rechenbeispiel: 10.000 Erstaufrufe/Monat ≈ 11 GB Traffic. Ob das im Free-Plan 
 |---|---|---|
 | Apple MapKit JS | Apple Developer Program Mitgliedschaft (kostenpflichtig); 250.000 Map-Views + 25.000 Service-Calls/Tag frei | Quoten ja (developer.apple.com/maps/web), Mitgliedsbeitrag nein |
 | Selbst gehostete OSM-Vektorkacheln (PMTiles) | Planet ≈ 120 GB (Protomaps-Doku); Cloudflare R2 frei nur 10 GB und laut Drittanleitungen mit Zahlungsmethode | Teilweise (Doku-Suche) – **verworfen**, solange Nullkosten gelten |
-| Routing mit API-Schlüssel (openrouteservice, GraphHopper) | Free-Tier mit Tageslimits | Nein |
+| Routing mit API-Schlüssel (openrouteservice, GraphHopper) | ORS Standard kostenlos (2.000/Tag) – **umgesetzt über Supabase-Proxy**; GraphHopper Free nur nicht-kommerziell (500 Credits/Tag, Suche) | ORS-Limits ja (FAQ), Supabase-Limits teilweise |
 | Eigener Routing-Server (OSRM/Valhalla) | VM mit viel RAM → laufende Kosten | Nein – nur mit Freigabe |
 | Serverseitiges Rendering | CPU/GPU-Zeit je Video | Nein – laut CLAUDE.md gesperrt ohne Freigabe |
 | Supabase o. ä. (Phase 6) | Free-Tier mit Limits, ggf. Pausierung | Nein |
