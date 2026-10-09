@@ -5,6 +5,14 @@ import {
 } from '../geodesy';
 import { ease, phaseAt, planTimeline, type TimelinePlan } from '../timeline';
 
+const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
+/** Sanfter Verlauf 0→1 (Spitzentempo nur 1,5× des Durchschnitts, statt 3× bei kubischem Easing). */
+const smooth = (x: number) => {
+  const t = clamp01(x);
+  return t * t * (3 - 2 * t);
+};
+const EARTH_CIRCUMFERENCE_M = 40_075_016.686;
+
 /** Logischer Viewport (CSS-Pixel). Export skaliert per pixelRatio, damit Framing auflösungsunabhängig bleibt. */
 export const LOGICAL_VIEWPORT = { width: 540, height: 960 } as const;
 const SAFE_PADDING = { top: 190, bottom: 210, left: 50, right: 50 };
@@ -101,27 +109,50 @@ function progressAt(model: SceneModel, tMs: number): Progress {
       return { segmentIndex: phase.stopIndex - 1, fraction: 1 };
     case 'move': {
       const f = (tMs - phase.startMs) / Math.max(1, phase.endMs - phase.startMs);
-      return { segmentIndex: phase.segmentIndex, fraction: ease('easeInOut', f) };
+      return { segmentIndex: phase.segmentIndex, fraction: smooth(f) };
     }
   }
+}
+
+/** Fahrtrichtung als Sehne über ±halbe Bildbreite: Kurven kleiner als der Bildausschnitt drehen die Karte nicht. */
+function smoothedHeadingDeg(index: LineIndex, distanceM: number, zoom: number, latDeg: number): number {
+  const mPerPx = (EARTH_CIRCUMFERENCE_M * Math.cos((latDeg * Math.PI) / 180)) / (512 * 2 ** zoom);
+  const half = 0.5 * LOGICAL_VIEWPORT.width * mPerPx;
+  const a = alongLine(index, Math.max(0, distanceM - half));
+  const b = alongLine(index, Math.min(index.totalM, distanceM + half));
+  if (a.point.lat === b.point.lat && a.point.lon === b.point.lon) return alongLine(index, distanceM).headingDeg;
+  return mapBearingDeg(a.point, b.point);
+}
+
+/** Richtung der Sehne so, wie sie auf der (Mercator-)Karte erscheint: 0° = Norden oben, im Uhrzeigersinn. */
+export function mapBearingDeg(a: GeoPoint, b: GeoPoint): number {
+  const dx = mercatorX(b.lon) - mercatorX(a.lon);
+  const dySouth = mercatorY(b.lat) - mercatorY(a.lat); // Mercator-Y wächst nach Süden
+  return ((Math.atan2(dx, -dySouth) * 180) / Math.PI + 360) % 360;
 }
 
 function followTarget(model: SceneModel, tMs: number): CameraState {
   const { segmentIndex, fraction } = progressAt(model, tMs);
   const s = model.segments[segmentIndex]!;
-  const { point, headingDeg } = alongLine(s.index, fraction * s.index.totalM);
+  const distance = fraction * s.index.totalM;
+  const { point } = alongLine(s.index, distance);
   const rotate = model.project.cameraPreset === 'follow-rotate';
-  let zoom = model.segmentZoom[segmentIndex]!;
+  // Mischung aus weit und nah: Auf langen Strecken ist die Kamera am Anfang und Ende (Start, Stopps, Ziel) näher dran,
+  // dazwischen weit gefasst, damit Straßenverlauf und Fortschritt lesbar bleiben. Kurze Strecken bleiben unverändert.
+  const far = model.segmentZoom[segmentIndex]!;
+  const boost = Math.min(3, Math.max(0, Math.log2(s.index.totalM / 1000 / 120)));
+  const nearWeight = 1 - smooth(Math.min(fraction, 1 - fraction) / 0.18);
+  let zoom = Math.min(12.5, far + boost * nearWeight);
   // Stopp mit „Zoom“: während der Pause näher heran (Glättung erfolgt über smoothedFollow)
   const phase = phaseAt(model.plan, tMs);
   if (phase.kind === 'pause' && model.project.journey.stops[phase.stopIndex]?.zoomIn) zoom = Math.min(13, zoom + 2);
-  return { center: point, zoom, bearing: rotate ? headingDeg : 0, pitch: rotate ? 35 : 0 };
+  return { center: point, zoom, bearing: rotate ? smoothedHeadingDeg(s.index, distance, zoom, point.lat) : 0, pitch: rotate ? 35 : 0 };
 }
 
 /** Zeitlich geglättete Kamera: Mittel über ein symmetrisches Fenster – deterministisch, ohne Zustand. */
 function smoothedFollow(model: SceneModel, tMs: number): CameraState {
-  const N = 9;
-  const windowMs = 1400;
+  const N = 13;
+  const windowMs = Math.min(2400, model.plan.totalMs * 0.2);
   let zoom = 0, bx = 0, by = 0, pitch = 0;
   for (let k = 0; k < N; k++) {
     const tt = Math.min(model.plan.totalMs, Math.max(0, tMs + (k / (N - 1) - 0.5) * windowMs));
@@ -174,9 +205,11 @@ function cameraAt(model: SceneModel, tMs: number): CameraState {
   const outro = phases[phases.length - 1]!;
   const follow = smoothedFollow(model, tMs);
   // Weicher Übergang Übersicht → Folgekamera (Intro + erste Bewegungssekunde) und zurück (Outro).
-  const inEnd = intro.endMs + Math.min(1500, totalMs * 0.1);
-  if (tMs < inEnd) return blendKeepTarget(model.overview, follow, ease('easeInOut', tMs / Math.max(1, inEnd)));
-  if (tMs > outro.startMs) return blendKeepTarget(model.overview, follow, 1 - ease('easeInOut', (tMs - outro.startMs) / Math.max(1, outro.endMs - outro.startMs)));
+  // Längerer, gleichmäßiger Zoom statt Sprung: Einblendung über Intro + bis zu 2,6 s, Ausblendung beginnt etwas früher.
+  const inEnd = intro.endMs + Math.min(2600, totalMs * 0.18);
+  if (tMs < inEnd) return blendKeepTarget(model.overview, follow, smooth(tMs / Math.max(1, inEnd)));
+  const outStart = Math.max(inEnd, outro.startMs - Math.min(1200, totalMs * 0.08));
+  if (tMs > outStart) return blendKeepTarget(model.overview, follow, 1 - smooth((tMs - outStart) / Math.max(1, outro.endMs - outStart)));
   return follow;
 }
 
