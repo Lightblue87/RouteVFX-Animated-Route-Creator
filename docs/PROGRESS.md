@@ -99,6 +99,11 @@ GPS-Aufzeichnung · Kartenlink-Import · Service-Worker-Update-Ablauf · Re-Rout
 - Umgesetzt (Unit-Tests `tests/unit/cameraQuality.test.ts`, Messung mit künstlicher 1.500-km-Route): sanftes Tempo (Spitze 1,5× statt 3×), Fahrtrichtung als Sehne über die halbe Bildbreite (max. 1,4° pro Bild, Summe 222°), Mischung aus nah (Start, Stopps, Ziel) und weit (lange Abschnitte), längerer Zoom von der Übersicht (bis 2,6 s), Ausblendung früher.
 - **Nicht verifiziert:** Eindruck im echten Export auf dem Gerät; Geländerelief/3D-Neigung und Vorausschau sind noch nicht Teil dieser Änderung.
 
+### Eigene Fotos auf der Route (2026-10-09)
+- Implementiert + getestet (Unit/E2E im Sandbox-Chromium): Fotos wählen (JPEG/PNG/WebP/HEIC), Aufnahmeort aus dem JPEG-Geo-Tag (eigener, begrenzter EXIF-Leser) oder per Tipp auf die Karte setzen; Punkt wird der nächstgelegenen Stelle der Route zugeordnet, das Foto erscheint als gerahmte Karte, wenn das Fahrzeug dort vorbeikommt (weiches Ein-/Ausblenden, nacheinander, Dauer 1–6 s, Bildunterschrift); Vorschau und Export nutzen denselben Zeichner; Duplizieren/Löschen/Aufräumen der Bilddaten; Metadaten werden aus der gespeicherten Kopie entfernt.
+- **Nicht verifiziert:** Foto-Auswahl und Geo-Tag auf echten iPhone/Android-Geräten (iOS entfernt den Standort standardmäßig), HEIC-Dekodierung außerhalb von Safari, MP4-Export mit Foto (Export-E2E braucht echtes Chrome/H.264; der Zeichner ist derselbe wie in der geprüften Vorschau), Speicherverhalten bei 12 Fotos auf schwachen Geräten.
+- Offen: Foto auf der Karte (Kartenmarker im Video), Foto-Reihenfolge/Zeitpunkt manuell einstellen, Foto bei Zwischenstopp zeigen.
+
 ### Nächste konkrete Schritte
 1. OpenFreeMap gegen den echten Dienst und im MP4-Export prüfen (außerhalb der Sandbox); Routing-Free-Tier (R-03): Bedingungen belegen, dann umsetzen.
 2. E2E: Hintergrund-Abbruch, Service-Worker-Update.

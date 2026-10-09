@@ -18,6 +18,8 @@ export interface StoredBlob {
   type: string;
   size: number;
   blob: Blob;
+  /** Zeitpunkt des Schreibens (ms). Fehlt bei älteren Einträgen; dient dem Schutz frisch importierter Medien vor dem Aufräumen. */
+  createdAt?: number;
 }
 
 export interface ProjectSummary {
@@ -55,7 +57,7 @@ export async function _resetDbHandle(): Promise<void> {
 }
 
 export class StorageError extends Error {
-  constructor(public readonly code: 'quota' | 'unknown', message: string) {
+  constructor(public readonly code: 'quota' | 'newer_version' | 'unknown', message: string) {
     super(message);
     this.name = 'StorageError';
   }
@@ -71,8 +73,19 @@ export async function saveProject(p: Project): Promise<void> {
   // Vor dem Schreiben validieren – verhindert das Persistieren inkonsistenter Zustände.
   const valid = migrateAndValidate(p);
   try {
-    await (await db()).put('projects', valid);
+    // Ein veralteter Tab (älterer App-Stand) darf einen neueren Datensatz nicht überschreiben: Er würde Felder
+    // verlieren, die er nicht kennt (z. B. Fotos), und deren Bilddaten später zum Aufräumen freigeben.
+    const tx = (await db()).transaction('projects', 'readwrite');
+    const stored = (await tx.store.get(valid.id)) as { schemaVersion?: number } | undefined;
+    if (typeof stored?.schemaVersion === 'number' && stored.schemaVersion > valid.schemaVersion) {
+      tx.abort();
+      await tx.done.catch(() => undefined);
+      throw new StorageError('newer_version', 'stored project is newer than this app version');
+    }
+    await tx.store.put(valid);
+    await tx.done;
   } catch (e) {
+    if (e instanceof StorageError) throw e;
     wrap(e);
   }
 }
@@ -111,6 +124,7 @@ export async function recoverJournals(): Promise<void> {
         await saveProject(journal);
         journalClearIfSame(journal);
       } catch (e) {
+        if (e instanceof StorageError && e.code === 'newer_version') continue; // neuerer Datensatz: Journal behalten, nicht überschreiben
         if (e instanceof StorageError) complete = false; // später erneut versuchen, Journal behalten
         else journalRemove(id); // unlesbar/ungültig: verwerfen
       }
@@ -166,11 +180,23 @@ export async function duplicateProject(p: Project, title: string): Promise<Proje
     const b = (await blobs.get(audio.assetId)) as StoredBlob | undefined;
     if (b) {
       const assetId = newId();
-      await blobs.put({ ...b, id: assetId, projectId: id });
+      await blobs.put({ ...b, id: assetId, projectId: id, createdAt: Date.now() });
       audio = { ...audio, assetId };
     }
   }
-  const copy = migrateAndValidate({ ...structuredClone(p), id, title: title.slice(0, 80), createdAt: now, modifiedAt: now, audio });
+  // Fotos: jede Kopie bekommt eigene Blob-IDs, damit sie das Löschen des Originals überlebt.
+  const photos = [];
+  for (const ph of p.photos) {
+    const b = (await blobs.get(ph.assetId)) as StoredBlob | undefined;
+    if (!b) {
+      photos.push(ph); // Blob fehlt bereits im Original: Verweis unverändert lassen statt Daten zu erfinden
+      continue;
+    }
+    const assetId = newId();
+    await blobs.put({ ...b, id: assetId, projectId: id, createdAt: Date.now() });
+    photos.push({ ...ph, assetId });
+  }
+  const copy = migrateAndValidate({ ...structuredClone(p), id, title: title.slice(0, 80), createdAt: now, modifiedAt: now, audio, photos });
   try {
     await tx.objectStore('projects').put(copy);
     await tx.done;
@@ -184,12 +210,17 @@ export async function duplicateProject(p: Project, title: string): Promise<Proje
  * Löscht Blobs eines Projekts, die nicht in `keep` stehen (z. B. entfernte oder ersetzte Audiodateien).
  * Nur aufrufen, wenn keine Undo-Historie mehr auf ältere Blobs verweisen kann – etwa beim Öffnen eines Projekts.
  */
-export async function pruneUnreferencedBlobs(projectId: string, keep: readonly string[]): Promise<number> {
+export const PRUNE_GRACE_MS = 10 * 60_000;
+
+export async function pruneUnreferencedBlobs(projectId: string, keep: readonly string[], graceMs = PRUNE_GRACE_MS, now = Date.now()): Promise<number> {
   const d = await db();
   const tx = d.transaction('blobs', 'readwrite');
   let removed = 0;
   for (const key of await tx.store.index('projectId').getAllKeys(projectId)) {
     if (keep.includes(String(key))) continue;
+    // Frisch importierte Medien sind evtl. noch nicht im gespeicherten Projekt vermerkt (Autosave-Verzögerung, zweiter Tab).
+    const b = (await tx.store.get(key)) as StoredBlob | undefined;
+    if (b?.createdAt !== undefined && now - b.createdAt < graceMs) continue;
     await tx.store.delete(key);
     removed++;
   }
@@ -199,7 +230,7 @@ export async function pruneUnreferencedBlobs(projectId: string, keep: readonly s
 
 export async function putBlob(b: StoredBlob): Promise<void> {
   try {
-    await (await db()).put('blobs', b);
+    await (await db()).put('blobs', { ...b, createdAt: b.createdAt ?? Date.now() });
   } catch (e) {
     wrap(e);
   }

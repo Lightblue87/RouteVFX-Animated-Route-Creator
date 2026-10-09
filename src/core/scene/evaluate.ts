@@ -1,7 +1,7 @@
 import type { Project, RouteSegment, LineStyle } from '../project/schema';
 import type { GeoPoint, RouteConfidence, TransportMode } from '../types';
 import {
-  alongLine, boundsOf, fitCamera, indexLine, latFromMercatorY, lonFromMercatorX, mercatorX, mercatorY, sliceLine, unwrapLongitudes, type LineIndex,
+  alongLine, boundsOf, fitCamera, indexLine, nearestOnLine, latFromMercatorY, lonFromMercatorX, mercatorX, mercatorY, sliceLine, unwrapLongitudes, type LineIndex,
 } from '../geodesy';
 import { ease, phaseAt, planTimeline, type TimelinePlan } from '../timeline';
 
@@ -47,7 +47,20 @@ export interface SceneState {
   modeChange: { mode: TransportMode; opacity: number } | null;
   /** Hinweis auf nicht-verifizierte Geometrie im aktuellen Abschnitt. */
   geometryNotice: 'estimated' | 'derived' | 'manually_edited' | null;
+  /** Gerade sichtbares Foto (höchstens eins zugleich). */
+  photo: { photoId: string; caption: string; width: number; height: number; opacity: number; progress: number } | null;
 }
+
+/** Zeitfenster, in dem ein Foto im Video erscheint (aus der Position des Fotos relativ zur Route). */
+export interface PhotoMoment {
+  photoId: string;
+  startMs: number;
+  endMs: number;
+  /** Abstand des Fotopunkts zur Route (zur Warnung in der Oberfläche). */
+  distanceToRouteM: number;
+}
+
+export const PHOTO_FADE_MS = 350;
 
 /** Vorberechnetes, unveränderliches Modell. Reine Funktion von Project. */
 export interface SceneModel {
@@ -57,6 +70,7 @@ export interface SceneModel {
   overview: CameraState;
   segmentZoom: number[];
   distanceTotalM: number;
+  photoMoments: PhotoMoment[];
 }
 
 function selectedGeometry(s: RouteSegment): GeoPoint[] {
@@ -64,8 +78,21 @@ function selectedGeometry(s: RouteSegment): GeoPoint[] {
   return alt && s.selectedAlternative > 0 ? alt.geometry : s.geometry;
 }
 
-export function buildSceneModel(project: Project): SceneModel {
-  const plan = planTimeline(project);
+interface RouteGeometry {
+  segments: SceneModel['segments'];
+  overview: CameraState;
+  segmentZoom: number[];
+  /** Foto-Projektionen auf die Route, je Punkt einmal berechnet (Fotos ändern sich oft, die Route selten). */
+  projections: Map<string, { distanceM: number; segIdx: number; alongM: number } | null>;
+}
+
+// Die Geometrie hängt nur von der Reise ab. Projekte sind unveränderlich, `journey` ist deshalb ein stabiler Schlüssel:
+// Beschriftungs- oder Dauer-Änderungen an Fotos berechnen weder Linienindizes noch Fotoprojektionen neu.
+const geometryCache = new WeakMap<Project['journey'], RouteGeometry>();
+
+function routeGeometry(project: Project): RouteGeometry {
+  const hit = geometryCache.get(project.journey);
+  if (hit) return hit;
   // Gesamte Reise fortlaufend entfalten (Datumsgrenze): Offset des vorigen Endpunkts übernehmen.
   let lastLon: number | null = null;
   const segments = project.journey.segments.map((seg) => {
@@ -88,8 +115,79 @@ export function buildSceneModel(project: Project): SceneModel {
     // Folgekamera etwas näher als Segmentübersicht, aber nie näher als Zoom 12.
     return Math.min(12, Math.max(overview.zoom, z + 0.6));
   });
+  const g: RouteGeometry = { segments, overview, segmentZoom, projections: new Map() };
+  geometryCache.set(project.journey, g);
+  return g;
+}
+
+export function buildSceneModel(project: Project): SceneModel {
+  const plan = planTimeline(project);
+  const { segments, overview, segmentZoom, projections } = routeGeometry(project);
   const distanceTotalM = project.journey.segments.reduce((a, s) => a + s.distanceM, 0);
-  return { project, plan, segments, overview, segmentZoom, distanceTotalM };
+  const photoMoments = schedulePhotos(project, plan, segments, projections);
+  return { project, plan, segments, overview, segmentZoom, distanceTotalM, photoMoments };
+}
+
+/** Umkehrung von smooth(): Zeitanteil u mit smooth(u) = f (Bisektion, monoton). */
+function invSmooth(f: number): number {
+  let lo = 0, hi = 1;
+  for (let i = 0; i < 30; i++) {
+    const mid = (lo + hi) / 2;
+    if (smooth(mid) < f) lo = mid;
+    else hi = mid;
+  }
+  return (lo + hi) / 2;
+}
+
+/**
+ * Wann kommt das Fahrzeug an einem Foto vorbei? Der Fotopunkt wird auf die nächstgelegene Stelle der Route abgebildet;
+ * der Zeitpunkt ergibt sich aus dem Fortschritt dort. Fotos werden nacheinander gezeigt (kein Überlappen).
+ */
+function schedulePhotos(project: Project, plan: TimelinePlan, segments: { index: LineIndex }[], cache: RouteGeometry['projections']): PhotoMoment[] {
+  const found: { photoId: string; at: number; hold: number; distanceToRouteM: number }[] = [];
+  const moves = plan.phases.filter((p) => p.kind === 'move');
+  for (const photo of project.photos) {
+    if (!photo.position) continue;
+    const key = `${photo.position.lat},${photo.position.lon}`;
+    let b = cache.get(key);
+    if (b === undefined) {
+      b = null;
+      segments.forEach((s, i) => {
+        const hit = nearestOnLine(s.index, photo.position!);
+        if (hit && (!b || hit.distanceM < b.distanceM - 1e-6)) b = { distanceM: hit.distanceM, segIdx: i, alongM: hit.alongM };
+      });
+      cache.set(key, b);
+    }
+    const mv = b ? moves[b.segIdx] : undefined;
+    if (!b || !mv) continue;
+    const f = segments[b.segIdx]!.index.totalM > 0 ? b.alongM / segments[b.segIdx]!.index.totalM : 0;
+    found.push({ photoId: photo.id, at: mv.startMs + invSmooth(Math.min(1, Math.max(0, f))) * (mv.endMs - mv.startMs), hold: photo.holdMs, distanceToRouteM: b.distanceM });
+  }
+  found.sort((a, b) => a.at - b.at);
+  const GAP_MS = 150;
+  const limit = plan.totalMs - 100;
+  // Voller Anzeigedauer wegen: Spätestmöglicher Start rückwärts vom Videoende, damit mehrere Fotos am Ende gemeinsam
+  // Platz finden. Passt ein Foto auch dann nicht (Start vor dem Ende des vorigen), entfällt es – nie verkürzt.
+  let items = found;
+  for (;;) {
+    const latest: number[] = [];
+    for (let i = items.length - 1; i >= 0; i--) latest[i] = (i === items.length - 1 ? limit : latest[i + 1]! - GAP_MS) - items[i]!.hold;
+    const out: PhotoMoment[] = [];
+    let cursor = 0;
+    let dropped = -1;
+    for (let i = 0; i < items.length; i++) {
+      const startMs = Math.min(Math.max(items[i]!.at, cursor), latest[i]!);
+      if (startMs < cursor) {
+        dropped = i;
+        break;
+      }
+      const endMs = startMs + items[i]!.hold;
+      out.push({ photoId: items[i]!.photoId, startMs, endMs, distanceToRouteM: items[i]!.distanceToRouteM });
+      cursor = endMs + GAP_MS;
+    }
+    if (dropped < 0) return out;
+    items = items.filter((_, i) => i !== dropped);
+  }
 }
 
 interface Progress {
@@ -223,7 +321,7 @@ export function evaluateScene(model: SceneModel, tMsRaw: number): SceneState {
   if (model.segments.length === 0) {
     return {
       tMs, totalMs: model.plan.totalMs, camera: model.overview, lines: [], vehicle: null, stops: stopsBase,
-      distanceDoneM: 0, distanceTotalM: 0, progress: tMs / model.plan.totalMs, title: p.title, modeChange: null, geometryNotice: null,
+      distanceDoneM: 0, distanceTotalM: 0, progress: tMs / model.plan.totalMs, title: p.title, modeChange: null, geometryNotice: null, photo: null,
     };
   }
   const { segmentIndex, fraction } = progressAt(model, tMs);
@@ -258,6 +356,21 @@ export function evaluateScene(model: SceneModel, tMsRaw: number): SceneState {
   const conf = active.seg.confidence;
   const geometryNotice = conf === 'estimated' || conf === 'derived' || conf === 'manually_edited' ? conf : null;
 
+  let photo: SceneState['photo'] = null;
+  const moment = model.photoMoments.find((m) => tMs >= m.startMs && tMs < m.endMs);
+  const shown = moment ? p.photos.find((x) => x.id === moment.photoId) : undefined;
+  if (moment && shown) {
+    const fade = Math.min(PHOTO_FADE_MS, (moment.endMs - moment.startMs) / 2);
+    photo = {
+      photoId: shown.id,
+      caption: shown.caption,
+      width: shown.width,
+      height: shown.height,
+      opacity: smooth(Math.min((tMs - moment.startMs) / fade, (moment.endMs - tMs) / fade)),
+      progress: (tMs - moment.startMs) / (moment.endMs - moment.startMs),
+    };
+  }
+
   return {
     tMs,
     totalMs: model.plan.totalMs,
@@ -271,5 +384,6 @@ export function evaluateScene(model: SceneModel, tMsRaw: number): SceneState {
     title: p.title,
     modeChange,
     geometryNotice,
+    photo,
   };
 }

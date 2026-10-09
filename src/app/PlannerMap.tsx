@@ -19,13 +19,16 @@ const HIT_RADIUS_PX = 22; // ≈ 44 px Touch-Ziel
  * Interaktive Planungskarte. Ohne Bearbeitung: Tippen fügt Stopp hinzu.
  * Im Bearbeitungsmodus: Kontrollpunkte ziehen, Mittelpunkte ziehen = Punkt einfügen, Punkt antippen = entfernen.
  */
-export function PlannerMap({ project, onTap, edit }: { project: Project; onTap: (p: GeoPoint) => void; edit?: GeometryEdit | null }) {
+export function PlannerMap({ project, onTap, edit, pick }: { project: Project; onTap: (p: GeoPoint) => void; edit?: GeometryEdit | null; pick?: ((p: GeoPoint) => void) | null }) {
   const ref = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MlMap | null>(null);
   const tapRef = useRef(onTap);
   tapRef.current = onTap;
   const editRef = useRef(edit);
   editRef.current = edit;
+  // Punktwahl (z. B. Position eines Fotos): Tippen auf die Karte liefert den Punkt statt einen Stopp anzulegen.
+  const pickRef = useRef(pick);
+  pickRef.current = pick;
   // Aktueller Projektstand für den (asynchronen) load-Handler – sonst zeichnet eine spät geladene Karte einen veralteten Stand.
   const projectRef = useRef(project);
   projectRef.current = project;
@@ -45,6 +48,10 @@ export function PlannerMap({ project, onTap, edit }: { project: Project; onTap: 
     });
     map.touchZoomRotate.disableRotation();
     map.on('click', (e: MapMouseEvent) => {
+      if (pickRef.current) {
+        pickRef.current({ lat: e.lngLat.lat, lon: e.lngLat.wrap().lng });
+        return;
+      }
       if (editRef.current) return; // im Bearbeitungsmodus keine neuen Stopps
       tapRef.current({ lat: e.lngLat.lat, lon: e.lngLat.wrap().lng });
     });
@@ -52,10 +59,12 @@ export function PlannerMap({ project, onTap, edit }: { project: Project; onTap: 
       map.addSource('route', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
       map.addSource('stops', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
       map.addSource('handles', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      map.addSource('photos', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
       map.addLayer({ id: 'route-casing', type: 'line', source: 'route', paint: { 'line-color': '#ffffff', 'line-width': 7 }, layout: { 'line-cap': 'round', 'line-join': 'round' } });
       map.addLayer({ id: 'route', type: 'line', source: 'route', filter: ['!', ['get', 'approx']], paint: { 'line-color': ['get', 'color'], 'line-width': 4 }, layout: { 'line-cap': 'round', 'line-join': 'round' } });
       map.addLayer({ id: 'route-approx', type: 'line', source: 'route', filter: ['get', 'approx'], paint: { 'line-color': ['get', 'color'], 'line-width': 4, 'line-dasharray': [1, 2] }, layout: { 'line-join': 'round' } });
       map.addLayer({ id: 'stops', type: 'circle', source: 'stops', paint: { 'circle-radius': 7, 'circle-color': '#ffffff', 'circle-stroke-color': '#1c1c1e', 'circle-stroke-width': 3 } });
+      map.addLayer({ id: 'photos', type: 'circle', source: 'photos', paint: { 'circle-radius': 8, 'circle-color': '#ff9f0a', 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 3 } });
       map.addLayer({
         id: 'handles', type: 'circle', source: 'handles',
         paint: {
@@ -161,7 +170,7 @@ export function PlannerMap({ project, onTap, edit }: { project: Project; onTap: 
   return (
     <div
       ref={ref}
-      className={`planner-map${edit ? ' editing' : ''}`}
+      className={`planner-map${edit ? ' editing' : ''}${pick ? ' picking' : ''}`}
       role="application"
       aria-label="Map"
       aria-busy={!ready}
@@ -207,6 +216,10 @@ function update(map: MlMap, p: Project, fit: boolean) {
   (map.getSource('stops') as GeoJSONSource).setData({
     type: 'FeatureCollection',
     features: p.journey.stops.map((s) => ({ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [s.position.lon, s.position.lat] } })),
+  });
+  (map.getSource('photos') as GeoJSONSource | undefined)?.setData({
+    type: 'FeatureCollection',
+    features: p.photos.flatMap((x) => (x.position ? [{ type: 'Feature' as const, properties: {}, geometry: { type: 'Point' as const, coordinates: [x.position.lon, x.position.lat] } }] : [])),
   });
   const pts = p.journey.segments.length ? p.journey.segments.flatMap((s) => unwrapLongitudes(s.geometry)) : p.journey.stops.map((s) => s.position);
   if (fit && pts.length) {

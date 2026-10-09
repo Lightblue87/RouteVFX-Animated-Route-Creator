@@ -21,6 +21,13 @@ Nach erstmaliger Nutzung eines Online-Dienstes wird `privacy.usedOnlineServices 
 ## Content Security Policy (Produktions-Build)
 `connect-src` erlaubt nur `'self'`, `routing.openstreetmap.de`, `nominatim.openstreetmap.org`, `tiles.openfreemap.org` (letzteres auch in `img-src` für Sprites). `script-src 'self'`, `object-src 'none'`, `form-action 'none'`.
 
+## Eigene Fotos (Stand 2026-10-09)
+- Fotos werden nur lokal verarbeitet (Auswahl vom Gerät, Dekodierung im Browser) und nie hochgeladen.
+- Der Aufnahmeort (EXIF-GPS, nur JPEG) wird ausschließlich gelesen, um den Punkt auf der Route vorzuschlagen. Gespeichert wird (a) eine auf höchstens 1280 px verkleinerte JPEG-Kopie **ohne Metadaten** im lokalen Blob-Speicher und (b) im Projekt nur der gewählte Punkt samt Herkunft („Geo-Tag“ oder „von Nutzer gesetzt“). Der Nutzer kann den Punkt jederzeit ändern.
+- iOS entfernt beim Auswählen den Standort standardmäßig; die App weist darauf hin (Optionen → Standort) und bietet das Setzen per Karte an.
+- Grenzen: höchstens 12 Fotos je Projekt, 25 MB und 60 Megapixel je Datei; SVG und andere Typen werden abgelehnt.
+- Fotos sind Teil des lokalen Projekts: Duplizieren kopiert sie, Löschen des Projekts entfernt sie; nicht mehr referenzierte Bilder werden beim Öffnen eines Projekts aufgeräumt.
+
 ## Speicherung und Löschung
 - Löschen eines Projekts entfernt Projekt-JSON und zugehörige Blobs in einer Transaktion.
 - Hinweis in der App: Browser/OS können lokale Daten löschen; ohne Cloud kein Backup.

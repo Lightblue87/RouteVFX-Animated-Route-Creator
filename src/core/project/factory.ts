@@ -45,6 +45,7 @@ export function createProject(locale: 'de' | 'en', title = ''): Project {
       showEstimateNotice: true,
     },
     journey: { stops: [], segments: [] },
+    photos: [],
     privacy: { usedOnlineServices: false },
   };
 }

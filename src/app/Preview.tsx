@@ -5,6 +5,7 @@ import { buildSceneModel, evaluateScene, LOGICAL_VIEWPORT } from '../core/scene/
 import { MapLibreSceneRenderer } from '../adapters/maps/maplibreRenderer';
 import { getStyleInfo } from '../adapters/maps/styles';
 import { drawOverlay } from '../scene/drawOverlay';
+import { disposePhotoImages, loadPhotoImages } from '../features/photos/store';
 
 /**
  * 9:16-Vorschau. Nutzt denselben Scene-Evaluator und Overlay-Zeichner wie der Export.
@@ -41,6 +42,24 @@ export function Preview({ project }: { project: Project }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project.mapStyleRef, project.locale]);
 
+  // Dekodierte Fotos für die Karte im Video (nur laden, wenn sich Fotos/Positionen ändern)
+  const photosRef = useRef<Map<string, ImageBitmap>>(new Map());
+  const photoKey = project.photos.map((x) => `${x.id}:${x.assetId}:${x.position ? 1 : 0}`).join('|');
+  useEffect(() => {
+    let cancelled = false;
+    void loadPhotoImages(project).then((m) => {
+      if (cancelled) return disposePhotoImages(m);
+      disposePhotoImages(photosRef.current);
+      photosRef.current = m;
+      draw();
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [photoKey]);
+  useEffect(() => () => disposePhotoImages(photosRef.current), []);
+
   const stateRef = useRef({ model, tMs, locale });
   stateRef.current = { model, tMs, locale };
 
@@ -59,6 +78,7 @@ export function Preview({ project }: { project: Project }) {
       vehicleColor: m.project.vehicleColor,
       vehicleStyle: m.project.vehicleStyle,
       attribution: styleInfo.attribution,
+      photos: photosRef.current,
       dark: styleInfo.variant === 'dark',
       scale: c.width / LOGICAL_VIEWPORT.width,
     });

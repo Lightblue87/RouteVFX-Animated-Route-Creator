@@ -11,6 +11,8 @@ export interface OverlayOptions {
   vehicleColor: string;
   vehicleStyle: 'symbol' | 'figure';
   attribution: string;
+  /** Dekodierte Fotos des Projekts (Schlüssel = Foto-ID). */
+  photos?: ReadonlyMap<string, ImageBitmap>;
   dark: boolean;
   /** Ausgabe-Pixel je logischem Pixel (2 für 1080p, 4 für 4K). */
   scale: number;
@@ -77,6 +79,12 @@ export function drawOverlay(ctx: CanvasRenderingContext2D, state: SceneState, pr
     const rot = ((state.vehicle.headingDeg - state.camera.bearing) * Math.PI) / 180;
     if (o.vehicleStyle === 'figure') drawVehicleFigure(ctx, state.vehicle.mode, p.x, p.y, rot, o.vehicleColor);
     else drawVehicle(ctx, state.vehicle.mode, p.x, p.y, rot, o.vehicleColor);
+  }
+
+  // Foto, das gerade an der Route vorbeikommt
+  if (state.photo) {
+    const img = o.photos?.get(state.photo.photoId);
+    if (img) drawPhotoCard(ctx, img, state.photo, o.dark);
   }
 
   // Lesbarkeits-Scrims hinter Titel und Kilometerzähler (WCAG-Kontrast für weiße Schrift)
@@ -394,4 +402,47 @@ function glyph(ctx: CanvasRenderingContext2D, mode: TransportMode) {
       ctx.stroke();
       break;
   }
+}
+
+const PHOTO_BOX = { w: 300, h: 215, top: 245 };
+
+/** Foto als gerahmte Karte oberhalb der Bildmitte (dort sitzt das Fahrzeug); weich ein-/ausgeblendet. Bildunterschrift nur per fillText. */
+function drawPhotoCard(ctx: CanvasRenderingContext2D, img: ImageBitmap, ph: NonNullable<SceneState['photo']>, dark: boolean) {
+  const { width: W } = LOGICAL_VIEWPORT;
+  const fit = Math.min(PHOTO_BOX.w / img.width, PHOTO_BOX.h / img.height);
+  const w = img.width * fit, h = img.height * fit;
+  const grow = 0.94 + 0.06 * ph.opacity; // leichtes Heranwachsen beim Einblenden
+  const cx = W / 2, cy = PHOTO_BOX.top + PHOTO_BOX.h / 2 + (1 - ph.opacity) * 10;
+  ctx.save();
+  ctx.globalAlpha = Math.max(0, Math.min(1, ph.opacity));
+  ctx.translate(cx, cy);
+  ctx.scale(grow, grow);
+  const frame = 6, r = 14;
+  ctx.shadowColor = 'rgba(0,0,0,0.45)';
+  ctx.shadowBlur = 18;
+  ctx.shadowOffsetY = 6;
+  ctx.fillStyle = dark ? '#1c1c1e' : '#ffffff';
+  ctx.beginPath();
+  ctx.roundRect(-w / 2 - frame, -h / 2 - frame, w + frame * 2, h + frame * 2, r + frame / 2);
+  ctx.fill();
+  ctx.shadowColor = 'transparent';
+  ctx.save();
+  ctx.beginPath();
+  ctx.roundRect(-w / 2, -h / 2, w, h, r);
+  ctx.clip();
+  ctx.drawImage(img, -w / 2, -h / 2, w, h);
+  if (ph.caption) {
+    const g = ctx.createLinearGradient(0, h / 2 - 56, 0, h / 2);
+    g.addColorStop(0, 'rgba(0,0,0,0)');
+    g.addColorStop(1, 'rgba(0,0,0,0.7)');
+    ctx.fillStyle = g;
+    ctx.fillRect(-w / 2, h / 2 - 56, w, 56);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = `600 16px ${FONT}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillText(ph.caption, 0, h / 2 - 12, w - 24);
+  }
+  ctx.restore();
+  ctx.restore();
 }

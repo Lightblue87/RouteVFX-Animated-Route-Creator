@@ -2,7 +2,9 @@ import { z } from 'zod';
 import { MAX_DURATION_MS, MIN_DURATION_MS, ROUTE_CONFIDENCES, TRANSPORT_MODES } from '../types';
 
 // Versioniertes, anbieterneutrales Projektmodell. Änderungen nur über Migrationen (migrations.ts).
-export const CURRENT_SCHEMA_VERSION = 1;
+// Version 2: Fotos (`photos`). Ältere App-Stände (Version 1) lehnen Version-2-Projekte als „neuer“ ab, statt unbekannte
+// Felder still zu verwerfen – sonst würde ein alter Tab beim Aufräumen die Foto-Daten löschen.
+export const CURRENT_SCHEMA_VERSION = 2;
 
 export const GeoPointSchema = z.object({
   lat: z.number().min(-90).max(90),
@@ -57,6 +59,29 @@ export const AudioSettingsSchema = z.object({
   muted: z.boolean(),
 });
 
+/** Maximale Anzahl Fotos je Projekt (Speicher, Ladezeit beim Export). */
+export const MAX_PHOTOS = 12;
+export const PHOTO_HOLD_MIN_MS = 1000;
+export const PHOTO_HOLD_MAX_MS = 6000;
+
+/**
+ * Eigenes Foto, das im Video erscheint, wenn das Fahrzeug an `position` vorbeikommt. Das Bild liegt als verkleinerte,
+ * metadatenfreie Kopie im lokalen Blob-Speicher (assetId); im Projekt steht nur der gewählte Punkt, nicht der Rohstandort.
+ * `position` null = noch nicht platziert (wird im Video nicht gezeigt).
+ */
+export const PhotoSchema = z.object({
+  id: z.string().min(1),
+  assetId: z.string().min(1),
+  fileName: z.string().max(200),
+  width: z.number().int().min(1).max(8192),
+  height: z.number().int().min(1).max(8192),
+  position: GeoPointSchema.nullable(),
+  /** Woher der Punkt stammt: Geo-Tag des Fotos oder vom Nutzer gesetzt. */
+  positionSource: z.enum(['exif', 'manual']).nullable().default(null),
+  caption: z.string().max(80).default(''),
+  holdMs: z.number().int().min(PHOTO_HOLD_MIN_MS).max(PHOTO_HOLD_MAX_MS).default(2500),
+});
+
 export const ProjectSchema = z.object({
   id: z.string().uuid(),
   schemaVersion: z.literal(CURRENT_SCHEMA_VERSION),
@@ -86,6 +111,7 @@ export const ProjectSchema = z.object({
     segments: z.array(RouteSegmentSchema),
   }),
   audio: AudioSettingsSchema.optional(),
+  photos: z.array(PhotoSchema).max(MAX_PHOTOS).default([]),
   privacy: z.object({ usedOnlineServices: z.boolean() }),
 });
 
@@ -94,6 +120,7 @@ export type Stop = z.infer<typeof StopSchema>;
 export type RouteSegment = z.infer<typeof RouteSegmentSchema>;
 export type LineStyle = z.infer<typeof LineStyleSchema>;
 export type AudioSettings = z.infer<typeof AudioSettingsSchema>;
+export type Photo = z.infer<typeof PhotoSchema>;
 
 export const FADE_MAX_MS = 20_000;
 /** Eingabe in Sekunden → gültige Fade-Dauer in ms (Schema-Bereich), ungültige Eingaben → 0. */

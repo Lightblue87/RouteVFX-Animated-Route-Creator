@@ -6,6 +6,7 @@ import { MapLibreSceneRenderer } from '../maps/maplibreRenderer';
 import { isOnlineMapReachable } from '../maps/availability';
 import { getStyleInfo } from '../maps/styles';
 import { VIDEO_BITRATE } from './capabilities';
+import { disposePhotoImages, loadPhotoImages } from '../../features/photos/store';
 import type { Locale } from '../../i18n';
 
 export class ExportError extends Error {
@@ -79,6 +80,7 @@ export async function exportMp4(req: ExportRequest): Promise<ExportResult> {
   canvas.height = profile.height;
   const ctx = canvas.getContext('2d', { alpha: false })!;
 
+  let photoImages = new Map<string, ImageBitmap>();
   let backgrounded = false;
   const onVis = () => {
     if (document.visibilityState === 'hidden') backgrounded = true;
@@ -90,6 +92,7 @@ export async function exportMp4(req: ExportRequest): Promise<ExportResult> {
     req.onProgress?.({ phase: 'prepare', frame: 0, frames });
     await renderer.whenReady();
     console.debug('[export] map ready');
+    photoImages = await loadPhotoImages(project);
     const videoSource = new CanvasSource(canvas, { codec: 'avc', bitrate: VIDEO_BITRATE[req.profile], keyFrameInterval: 2 });
     output.addVideoTrack(videoSource, { frameRate: fps });
     let audioSource: AudioBufferSource | null = null;
@@ -112,6 +115,7 @@ export async function exportMp4(req: ExportRequest): Promise<ExportResult> {
       vehicleColor: project.vehicleColor,
       vehicleStyle: project.vehicleStyle,
       attribution: [...attributions].join(' · '),
+      photos: photoImages,
       dark: styleInfo.variant === 'dark',
     };
 
@@ -155,6 +159,7 @@ export async function exportMp4(req: ExportRequest): Promise<ExportResult> {
     throw new ExportError('encode_failed', (e as Error)?.message ?? String(e));
   } finally {
     document.removeEventListener('visibilitychange', onVis);
+    disposePhotoImages(photoImages);
     renderer.dispose();
     host.remove();
   }

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { deleteProject, duplicateProject, getBlob, pruneUnreferencedBlobs, listProjects, loadProject, putBlob, saveProject, _resetDbHandle } from '../../src/adapters/storage/idb';
 import { multimodalProject } from '../fixtures/project';
 import { openDB } from 'idb';
+import { StorageError } from '../../src/adapters/storage/idb';
 
 describe('IndexedDB storage', () => {
   beforeEach(async () => {
@@ -64,11 +65,36 @@ describe('IndexedDB storage', () => {
     await blob('old1', p.id);
     await blob('old2', p.id);
     await blob('foreign', other.id);
-    expect(await pruneUnreferencedBlobs(p.id, ['keep'])).toBe(2);
+    expect(await pruneUnreferencedBlobs(p.id, ['keep'], 0)).toBe(2);
     expect(await getBlob('keep')).toBeDefined();
     expect(await getBlob('old1')).toBeUndefined();
     expect(await getBlob('old2')).toBeUndefined();
     expect(await getBlob('foreign')).toBeDefined();
+  });
+  it('Aufräumen schützt frisch importierte Medien (noch nicht gespeicherter Verweis, zweiter Tab), entfernt aber ältere', async () => {
+    const p = await multimodalProject();
+    const blob = (id: string) => putBlob({ id, projectId: p.id, name: 'f.jpg', type: 'image/jpeg', size: 3, blob: new Blob(['abc']) });
+    await blob('fresh');
+    expect((await getBlob('fresh'))!.createdAt).toBeTypeOf('number');
+    expect(await pruneUnreferencedBlobs(p.id, [])).toBe(0);
+    expect(await getBlob('fresh')).toBeDefined();
+    // später (nach der Schonfrist) ist es verwaist und wird entfernt
+    expect(await pruneUnreferencedBlobs(p.id, [], undefined, Date.now() + 11 * 60_000)).toBe(1);
+    expect(await getBlob('fresh')).toBeUndefined();
+  });
+  it('ein Datensatz mit neuerer Schemaversion wird von einem veralteten Stand nicht überschrieben', async () => {
+    const p = await multimodalProject();
+    await saveProject(p);
+    // simuliert: anderer Tab (neuere App) hat Version+1 gespeichert
+    const d = await openDB('arc-local');
+    await d.put('projects', { ...p, schemaVersion: p.schemaVersion + 1, title: 'neuer' });
+    d.close();
+    await _resetDbHandle();
+    await expect(saveProject({ ...p, title: 'alt' })).rejects.toMatchObject({ code: 'newer_version' });
+    await expect(saveProject({ ...p, title: 'alt' })).rejects.toBeInstanceOf(StorageError);
+    const d2 = await openDB('arc-local');
+    expect((await d2.get('projects', p.id)).title).toBe('neuer');
+    d2.close();
   });
 });
 

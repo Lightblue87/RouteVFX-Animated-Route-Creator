@@ -8,6 +8,7 @@ import type { RoutingSettings } from '../adapters/routing/registry';
 import { addStop, applyControlPoints, appendGpxTrack, controlPointsOf, changeSegmentMode, LatestRequestGate, markOnlineUsed, fillMissingSegments, missingPairs, moveStop, normalizeSegments, replaceSegmentIfUnchanged, removeStop, updateSegment, updateStop } from '../features/projects/journey';
 import { GPX_MAX_BYTES, GpxError, parseGpx } from '../features/imports/gpx';
 import type { RouteSegment } from '../core/project/schema';
+import { PhotoPanel } from './PhotoPanel';
 import { RoutingError, TRANSPORT_MODES, type GeoPoint, type TransportMode } from '../core/types';
 import { formatKm, type MessageKey } from '../i18n';
 
@@ -49,6 +50,8 @@ export function RoutePanel({ api }: { api: ProjectApi }) {
   const settings: RoutingSettings = useMemo(() => ({ onlineAllowed: online, online: onlineRouting }), [online]);
   const fileRef = useRef<HTMLInputElement>(null);
   const [editId, setEditId] = useState<string | null>(null);
+  // Foto, dessen Ort gerade per Tipp auf die Karte gesetzt wird
+  const [pickPhotoId, setPickPhotoId] = useState<string | null>(null);
   const editSeg = project.journey.segments.find((s) => s.id === editId) ?? null;
   const edit = editSeg
     ? {
@@ -209,7 +212,12 @@ export function RoutePanel({ api }: { api: ProjectApi }) {
 
   return (
     <div className="panel route-panel">
-      <PlannerMap project={project} edit={edit} onTap={(p) => add(p, `${p.lat.toFixed(3)}, ${p.lon.toFixed(3)}`)} />
+      <PlannerMap project={project} edit={edit} onTap={(p) => add(p, `${p.lat.toFixed(3)}, ${p.lon.toFixed(3)}`)}
+        pick={pickPhotoId ? (pt) => {
+          const id = pickPhotoId;
+          setPickPhotoId(null);
+          commit((p) => ({ ...p, modifiedAt: new Date().toISOString(), photos: p.photos.map((x) => (x.id === id ? { ...x, position: { lat: pt.lat, lon: pt.lon }, positionSource: 'manual' as const } : x)) }));
+        } : null} />
       {edit && (
         <div className="card row edit-bar" role="status">
           <span className="grow small">{t('route.editHint')}</span>
@@ -313,6 +321,7 @@ export function RoutePanel({ api }: { api: ProjectApi }) {
             </button>
           </div>
         )}
+        <PhotoPanel api={api} picking={pickPhotoId} onPick={setPickPhotoId} />
         <label className="toggle small">
           <input type="checkbox" checked={online} onChange={(e) => { setOnline(e.target.checked); if (e.target.checked) void recomputeRoads(); }} data-testid="online-toggle" />
           {t('route.onlineToggle', { router: ROUTER_NAME })}
