@@ -7,7 +7,7 @@ const line = (a: [number, number], b: [number, number], n = 50) =>
   Array.from({ length: n + 1 }, (_, i) => ({ lat: a[0] + ((b[0] - a[0]) * i) / n, lon: a[1] + ((b[1] - a[1]) * i) / n }));
 
 function proj(photos: [number, number][], opts: Partial<RouteSegment> = {}): Project {
-  const base = createProject('t', 'de');
+  const base = createProject('de');
   const geometry = line([52, 9], [52, 19]); // ~685 km
   const seg: RouteSegment = {
     id: 's1', fromStopId: 'a', toStopId: 'b', mode: 'car', via: [], geometry, geometryVersion: 1, source: 'ors', confidence: 'provider_verified',
