@@ -148,6 +148,16 @@ export function PlannerMap({ project, onTap, edit }: { project: Project; onTap: 
     if (map && loaded.current) updateHandles(map, edit?.points ?? null);
   }, [edit]);
 
+  // Die Kartenhöhe ändert sich beim Wechsel in den/aus dem Bearbeitungsmodus: Zeichenfläche neu anpassen (MapLibre
+  // beobachtet nur das Fenster, nicht den Container).
+  const editing = !!edit;
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const id = requestAnimationFrame(() => map.resize());
+    return () => cancelAnimationFrame(id);
+  }, [editing]);
+
   return (
     <div
       ref={ref}
