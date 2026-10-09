@@ -104,6 +104,7 @@ Invoke-RestMethod -Method Post -Uri "https://<projekt-ref>.supabase.co/functions
 | `quota_unavailable` (503) | SQL aus Schritt 3 fehlt oder ist fehlgeschlagen (beide Dateien, in Reihenfolge) | Schritt 3 wiederholen |
 | `quota` (429) | Tages- oder Minutenlimit erreicht | kurz warten bzw. morgen wieder; Limits per Secret anpassbar |
 | `upstream_quota` (503) / `upstream` (502) | ORS lehnt ab (Schlüssel falsch oder Kontingent leer) | Schlüssel in Schritt 4 prüfen, HeiGIT-Dashboard ansehen |
+| `upstream` (502) mit `upstreamCode` | ORS-Fehlercode (z. B. 2004 = Limit überschritten, etwa Alternativrouten über ~100 km; die App wiederholt dann ohne Alternativen) | Bei Dauerfehler Code notieren und ORS-Doku „Errors“ prüfen |
 | `too_long` (422) | Strecke übersteigt ein ORS-Limit des Profils (z. B. sehr weite Fußstrecke) | Strecke teilen oder anderes Verkehrsmittel; Function neu deployen, damit der Hinweis erscheint |
 | `upstream_unreachable` (502) | ORS nicht erreichbar | später erneut; ggf. `ORS_BASE_URL` prüfen |
 

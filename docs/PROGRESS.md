@@ -90,6 +90,10 @@ GPS-Aufzeichnung · Kartenlink-Import · Service-Worker-Update-Ablauf · Re-Rout
 - Implementiert + getestet (Unit/Contract/E2E im Sandbox-Chromium): Fehlerursache des Proxys wird bis in den Segment-Hinweis durchgereicht (`proxy_*`-Texte DE/EN); Hinweis-Karte „Straßenroute berechnen“ bzw. „erneut versuchen“; Einschalten des Online-Schalters berechnet vorhandene Näherungsstrecken (Auto/Motorrad/Rad/Fuß) in einem Schritt (ein Undo); Proxy meldet ORS-Fehler 2004 als `too_long` (Function muss dafür neu deployt werden – optional).
 - **Nicht verifiziert:** Ablauf mit dem echten Supabase-Proxy im Browser des Nutzers (Grund der geraden Linie dort war nicht bestimmbar).
 
+### Geräterückmeldung zu Straßenrouten (2026-10-09)
+- iPhone-Test: App erreicht den Proxy, Hinweis „Routinganbieter hat die Anfrage abgelehnt“ (`proxy_upstream`, 502) bei Garbsen → Girona (~1.258 km, Auto). Vermutete Ursache (**nicht verifiziert**): Anbieter-Limit für Alternativrouten. Gegenmaßnahme: einmaliger Wiederholungsversuch ohne Alternativen im Client (wirkt ohne Neudeploy); Proxy gibt zusätzlich den numerischen ORS-Fehlercode zur Diagnose aus (`upstreamCode`, nach Neudeploy).
+- Offen: Bestätigung auf dem Gerät, ob die Hauptroute über 1.200 km vom Anbieter berechnet wird (ORS-Distanzlimit des Profils unbekannt).
+
 ### Nächste konkrete Schritte
 1. OpenFreeMap gegen den echten Dienst und im MP4-Export prüfen (außerhalb der Sandbox); Routing-Free-Tier (R-03): Bedingungen belegen, dann umsetzen.
 2. E2E: Hintergrund-Abbruch, Service-Worker-Update.

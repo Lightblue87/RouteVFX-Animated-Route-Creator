@@ -110,6 +110,11 @@ describe('Routing-Proxy (Supabase Edge Function, Handler)', () => {
     ];
     for (const [r, status] of cases) expect((await handleRoute(post(BODY), ENV, deps(r))).status).toBe(status);
   });
+  it('passes only the numeric provider error code on generic upstream failures', async () => {
+    const body = async (r: () => Promise<Response>) => (await handleRoute(post(BODY), ENV, deps(r))).json();
+    expect(await body(async () => res({ error: { code: 2099, message: 'secret detail' } }, 500))).toEqual({ error: 'upstream', upstreamCode: 2099 });
+    expect(await body(async () => res({ error: 'text' }, 500))).toEqual({ error: 'upstream' });
+  });
   it('client key: salted, changes daily, does not contain the IP', async () => {
     const a = await clientKey('203.0.113.7', 'salt', new Date('2026-10-08T10:00:00Z'));
     const b = await clientKey('203.0.113.7', 'salt', new Date('2026-10-09T10:00:00Z'));
@@ -169,6 +174,25 @@ describe('ORS-Proxy-Adapter (Client)', () => {
     setTimeout(() => ctl.abort(), 100); // während der ~1-s-Drosselung
     await expect(second).rejects.toMatchObject({ code: 'aborted' });
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+  it('retries once without alternatives when the provider rejects the request with alternatives (distance limit)', async () => {
+    const ok = { routes: [{ coordinates: [[9.7, 52.3], [2.8, 41.9]], distanceM: 1_400_000, durationS: 50_000 }], attribution: ORS_ATTRIBUTION };
+    const fetchMock = vi.fn(async (_u: unknown, init?: RequestInit) =>
+      JSON.parse(init!.body as string).alternatives ? res({ error: 'upstream' }, 502) : res(ok),
+    );
+    const p = createOrsProxyProvider('https://x', fetchMock as unknown as typeof fetch);
+    const r = await p.route({ start: H, end: B, via: [], mode: 'car', alternatives: true });
+    expect(r).toHaveLength(1);
+    expect(r[0]!.confidence).toBe('provider_verified');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(JSON.parse((fetchMock.mock.calls[1]![1] as RequestInit).body as string).alternatives).toBe(false);
+    // Ohne Alternativen angefragt: kein Wiederholen; andere Fehler werden nicht wiederholt
+    const f2 = vi.fn(async () => res({ error: 'upstream' }, 502));
+    await expect(createOrsProxyProvider('https://x', f2 as unknown as typeof fetch).route({ start: H, end: B, via: [], mode: 'car' })).rejects.toMatchObject({ detail: 'upstream' });
+    expect(f2).toHaveBeenCalledTimes(1);
+    const f3 = vi.fn(async () => res({ error: 'quota' }, 429));
+    await expect(createOrsProxyProvider('https://x', f3 as unknown as typeof fetch).route({ start: H, end: B, via: [], mode: 'car', alternatives: true })).rejects.toMatchObject({ code: 'rate_limited' });
+    expect(f3).toHaveBeenCalledTimes(1);
   });
   it('rejects unsupported modes without a request', async () => {
     const fetchMock = vi.fn();

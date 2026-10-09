@@ -182,7 +182,8 @@ export async function handleRoute(req: Request, env: ProxyEnv, deps: ProxyDeps):
     if (code === 2009 || code === 2010) return json(422, { error: 'no_route' }, origin);
     // 2004: Anfrage überschreitet ein Limit des Anbieters (z. B. maximale Distanz je Profil).
     if (code === 2004) return json(422, { error: 'too_long' }, origin);
-    return json(502, { error: 'upstream' }, origin);
+    // Numerischer Fehlercode des Anbieters (z. B. 2004 = Limit überschritten) hilft bei der Diagnose; sonst nichts durchreichen.
+    return json(502, typeof code === 'number' ? { error: 'upstream', upstreamCode: code } : { error: 'upstream' }, origin);
   }
   const routes = toRoutes(data);
   if (!routes) return json(502, { error: 'upstream_invalid' }, origin);
