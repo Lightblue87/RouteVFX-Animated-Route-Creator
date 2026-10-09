@@ -104,8 +104,37 @@ test('Fotos: ungültige Dateien werden abgelehnt, das Projekt bleibt benutzbar',
   await page.getByTestId('create-project').click();
   await page.getByTestId('photo-input').setInputFiles({ name: 'x.svg', mimeType: 'image/svg+xml', buffer: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>') });
   await expect(page.getByTestId('photo-message')).toContainText(/nicht unterstützt|not supported/);
+  // Kein Bild (Dateikopf passt zu keinem Bildtyp), obwohl der MIME-Typ „image/jpeg“ behauptet wird
   await page.getByTestId('photo-input').setInputFiles({ name: 'kaputt.jpg', mimeType: 'image/jpeg', buffer: Buffer.from('das ist kein bild') });
+  await expect(page.getByTestId('photo-message')).toContainText(/nicht unterstützt|not supported/);
+  // Gültiger JPEG-Kopf, aber abgeschnittene/zerstörte Bilddaten: nicht lesbar
+  const { readFileSync } = await import('node:fs');
+  const cut = readFileSync(FIX('photo-nogps.jpg')).subarray(0, 220);
+  await page.getByTestId('photo-input').setInputFiles({ name: 'abgeschnitten.jpg', mimeType: 'image/jpeg', buffer: cut });
   await expect(page.getByTestId('photo-message')).toContainText(/nicht gelesen|could not be read/);
   await expect(page.getByTestId('photo-item')).toHaveCount(0);
   await expect(page.getByTestId('save-state')).toHaveText(/Gespeichert|Saved/);
+});
+
+test('Fotos: gültiges JPEG ohne MIME-Typ wird angenommen; übergroße Pixelangabe wird vor dem Dekodieren abgelehnt', async ({ page }) => {
+  const { readFileSync } = await import('node:fs');
+  const jpg = readFileSync(FIX('photo-gps.jpg'));
+  await page.goto('/');
+  await page.getByTestId('create-project').click();
+  await page.getByTestId('photo-input').setInputFiles({ name: 'IMG_0001', mimeType: '', buffer: jpg });
+  await expect(page.getByTestId('photo-item')).toHaveCount(1);
+  await expect(page.getByTestId('photo-source')).toContainText(/Geo-Tag|geotag/);
+
+  // SOF auf 12000×9000 setzen (108 MP): wird anhand des Kopfes abgelehnt, ohne dass ein Bild dekodiert wird
+  const big = Buffer.from(jpg);
+  for (let i = 2; i + 9 < big.length; i++) {
+    if (big[i] === 0xff && big[i + 1] === 0xc0) {
+      big.writeUInt16BE(9000, i + 5);
+      big.writeUInt16BE(12000, i + 7);
+      break;
+    }
+  }
+  await page.getByTestId('photo-input').setInputFiles({ name: 'riesig.jpg', mimeType: 'image/jpeg', buffer: big });
+  await expect(page.getByTestId('photo-message')).toContainText(/zu viele Pixel|too many pixels/);
+  await expect(page.getByTestId('photo-item')).toHaveCount(1);
 });
