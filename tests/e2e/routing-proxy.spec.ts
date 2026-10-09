@@ -181,3 +181,29 @@ test('Widerruf während der Client-Drosselung sendet keine weitere Anfrage', asy
   await page.waitForTimeout(2500);
   expect(calls).toBe(1);
 });
+
+test('Stopp während der Sammelberechnung entfernt: fehlende Verbindung wird danach berechnet', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('create-project').click();
+  const toggle = page.getByTestId('online-toggle');
+  test.skip(!/Supabase/.test((await toggle.locator('..').textContent()) ?? ''), 'Build ohne VITE_ROUTING_PROXY_URL');
+
+  await page.context().route(PROXY, async (route) => {
+    const req = route.request();
+    const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'content-type' };
+    if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
+    await new Promise((r) => setTimeout(r, 1500));
+    const [a, b] = req.postDataJSON().coordinates as number[][];
+    return route.fulfill({ status: 200, headers: cors, json: { routes: [{ coordinates: [a, b], distanceM: 1000, durationS: 60 }], attribution: ATTRIBUTION } });
+  });
+
+  await addPlace(page, 'Hannover', /Hannover|Hanover/);
+  await addPlace(page, 'Braunschweig', /Braunschweig/);
+  await addPlace(page, 'Bielefeld', /Bielefeld/);
+  await expect(page.getByTestId('segment')).toHaveCount(2);
+
+  await toggle.check(); // Sammelberechnung startet (Antwort 1,5 s verzögert)
+  await page.locator('.stop button.danger').nth(1).click(); // mittleren Stopp entfernen → beide Segmente weg, Verbindung fehlt
+  // Nach Abschluss der Sammelberechnung muss die neue Verbindung Hannover → Bielefeld berechnet werden
+  await expect(page.getByTestId('segment')).toHaveCount(1, { timeout: 15_000 });
+});

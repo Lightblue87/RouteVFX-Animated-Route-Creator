@@ -69,6 +69,8 @@ export function RoutePanel({ api }: { api: ProjectApi }) {
 
   // Fehlende Segmente nach Stopp-Änderungen berechnen
   const pending = useRef(false);
+  // Nach einer Sammelberechnung erneut prüfen: Änderungen währenddessen (z. B. Stopp entfernt) wurden vom Effekt übersprungen.
+  const [recheck, setRecheck] = useState(0);
   useEffect(() => {
     const orphan = project.journey.segments.length > Math.max(0, project.journey.stops.length - 1);
     if (orphan && missingPairs(project).length === 0) {
@@ -95,7 +97,7 @@ export function RoutePanel({ api }: { api: ProjectApi }) {
         pending.current = false;
         setBusy(false);
       });
-  }, [project, settings, commit]);
+  }, [project, settings, commit, recheck]);
 
   const add = (point: GeoPoint, label: string) => {
     commit((p) => addStop(p, point, label));
@@ -193,6 +195,7 @@ export function RoutePanel({ api }: { api: ProjectApi }) {
       pending.current = false;
       batchAbort.current = null;
       setBusy(false);
+      setRecheck((n) => n + 1);
     }
   };
 
