@@ -7,6 +7,7 @@ import { createOnlineRoutingProvider } from '../adapters/routing/config';
 import type { RoutingSettings } from '../adapters/routing/registry';
 import { addStop, applyControlPoints, appendGpxTrack, controlPointsOf, changeSegmentMode, LatestRequestGate, markOnlineUsed, fillMissingSegments, missingPairs, moveStop, normalizeSegments, replaceSegmentIfUnchanged, removeStop, updateSegment, updateStop } from '../features/projects/journey';
 import { GPX_MAX_BYTES, GpxError, parseGpx } from '../features/imports/gpx';
+import type { RouteSegment } from '../core/project/schema';
 import { TRANSPORT_MODES, type GeoPoint, type TransportMode } from '../core/types';
 import { formatKm, type MessageKey } from '../i18n';
 
@@ -147,6 +148,34 @@ export function RoutePanel({ api }: { api: ProjectApi }) {
     }
   };
 
+  // Straßen-/Wegmodi, die nur als gerade Näherung vorliegen: Online-Routing nachholen (ausdrückliche Nutzeraktion).
+  const ROAD_MODES: TransportMode[] = ['car', 'motorcycle', 'bike', 'walk'];
+  const estimatedRoad = project.journey.segments.filter((s) => s.confidence === 'estimated' && ROAD_MODES.includes(s.mode) && onlineRouting.supportedModes.includes(s.mode));
+  const recomputeRoads = async () => {
+    if (pending.current || estimatedRoad.length === 0) return;
+    pending.current = true;
+    setBusy(true);
+    try {
+      const allowed: RoutingSettings = { onlineAllowed: true, online: onlineRouting };
+      const done: { base: RouteSegment; segment: RouteSegment }[] = [];
+      const all: string[] = [];
+      let used = false;
+      for (const seg of estimatedRoad) {
+        const r = await changeSegmentMode(project, seg.id, seg.mode, allowed);
+        if (!r) continue;
+        used ||= r.usedOnline;
+        all.push(...r.notices);
+        done.push({ base: r.base, segment: r.segment });
+      }
+      if (used) commitDerived(markOnlineUsed);
+      if (done.length) commit((cur) => done.reduce((acc, d) => replaceSegmentIfUnchanged(acc, d.base, d.segment), cur));
+      setNotices(all);
+    } finally {
+      pending.current = false;
+      setBusy(false);
+    }
+  };
+
   const totalM = project.journey.segments.reduce((a, s) => a + s.distanceM, 0);
 
   return (
@@ -247,8 +276,16 @@ export function RoutePanel({ api }: { api: ProjectApi }) {
             );
           })}
         </ol>
+        {estimatedRoad.length > 0 && (
+          <div className="card" role="status">
+            {!online && <p className="small">{t('route.roadsHint')}</p>}
+            <button className="btn primary small" onClick={() => { setOnline(true); void recomputeRoads(); }} disabled={busy} data-testid="compute-roads">
+              {online ? t('route.retryRoads') : t('route.computeRoads')}
+            </button>
+          </div>
+        )}
         <label className="toggle small">
-          <input type="checkbox" checked={online} onChange={(e) => setOnline(e.target.checked)} data-testid="online-toggle" />
+          <input type="checkbox" checked={online} onChange={(e) => { setOnline(e.target.checked); if (e.target.checked) void recomputeRoads(); }} data-testid="online-toggle" />
           {t('route.onlineToggle', { router: onlineRouting.id === 'ors-proxy' ? 'openrouteservice (HeiGIT) · Supabase' : 'FOSSGIS-OSRM' })}
         </label>
       </div>

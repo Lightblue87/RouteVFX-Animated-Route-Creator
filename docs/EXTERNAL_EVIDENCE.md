@@ -41,6 +41,9 @@ Primärquelle: `README.md` und `LICENSE.md` aus github.com/hyperknot/openfreemap
 
 Technisch verifiziert (Sandbox, OpenFreeMap **simuliert** mit synthetischen Kacheln im OpenMapTiles-Schema – keine OSM-Daten): Stil besteht die MapLibre-Validierung, Kacheln/TileJSON/Glyphen/Sprite werden nur nach Auswahl des Stils angefragt, Attribution und Datenschutzhinweis sichtbar, Planungskarte nutzt den Stil, Rückfall ohne Dienst. **Nicht** gegen den echten Dienst getestet (Sandbox blockiert tiles.openfreemap.org).
 
+## E04-Mapbox / Google Maps: Alternativen geprüft? {#e04-mapbox}
+Stand 2026-10-09, **UNKNOWN / nicht aktiviert**. Mapbox GL JS (ab v2 proprietär, Token und Mapbox-Daten nötig) und Google Maps Platform (Abrechnungskonto nötig; Bedingungen schränken Speichern/Ableiten von Routen und Kartendaten ein) wurden **nicht gegen die aktuellen Bedingungen geprüft**. Konsequenz: nicht als Exportquelle und nicht im kostenlosen Standardpfad verwenden, bis Videoexport, 4K, Social-Veröffentlichung und Kostenrahmen schriftlich belegt sind. Verantwortlich: Produktverantwortlicher.
+
 ## Lizenzen der verwendeten Bibliotheken (npm-Metadaten, 2026-10-08)
 
 | Paket | Version | Lizenz |
