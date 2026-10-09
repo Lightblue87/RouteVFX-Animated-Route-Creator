@@ -8,7 +8,7 @@ import type { RoutingSettings } from '../adapters/routing/registry';
 import { addStop, applyControlPoints, appendGpxTrack, controlPointsOf, changeSegmentMode, LatestRequestGate, markOnlineUsed, fillMissingSegments, missingPairs, moveStop, normalizeSegments, replaceSegmentIfUnchanged, removeStop, updateSegment, updateStop } from '../features/projects/journey';
 import { GPX_MAX_BYTES, GpxError, parseGpx } from '../features/imports/gpx';
 import type { RouteSegment } from '../core/project/schema';
-import { TRANSPORT_MODES, type GeoPoint, type TransportMode } from '../core/types';
+import { RoutingError, TRANSPORT_MODES, type GeoPoint, type TransportMode } from '../core/types';
 import { formatKm, type MessageKey } from '../i18n';
 
 const ONLINE_KEY = 'arc.onlineAllowed';
@@ -36,8 +36,10 @@ export function RoutePanel({ api }: { api: ProjectApi }) {
   const [online, setOnlineState] = useOnlineSetting();
   // Aktuelle Einwilligung, auch für laufende Sammelberechnungen: ein Widerruf stoppt weitere Übertragungen sofort.
   const consent = useRef(online);
+  const batchAbort = useRef<AbortController | null>(null);
   const setOnline = (v: boolean) => {
     consent.current = v;
+    if (!v) batchAbort.current?.abort(); // auch eine in der Drosselung wartende Anfrage wird nicht mehr gesendet
     setOnlineState(v);
   };
   const settings: RoutingSettings = useMemo(() => ({ onlineAllowed: online, online: onlineRouting }), [online]);
@@ -167,9 +169,17 @@ export function RoutePanel({ api }: { api: ProjectApi }) {
       const done: { base: RouteSegment; segment: RouteSegment }[] = [];
       const all: string[] = [];
       let used = false;
+      const ctl = new AbortController();
+      batchAbort.current = ctl;
       for (const seg of estimatedRoad) {
         if (!consent.current) break;
-        const r = await changeSegmentMode(project, seg.id, seg.mode, allowed);
+        let r;
+        try {
+          r = await changeSegmentMode(project, seg.id, seg.mode, allowed, ctl.signal);
+        } catch (e) {
+          if (e instanceof RoutingError && e.code === 'aborted') break; // Einwilligung widerrufen
+          throw e;
+        }
         if (!r) continue;
         used ||= r.usedOnline;
         all.push(...r.notices);
@@ -181,6 +191,7 @@ export function RoutePanel({ api }: { api: ProjectApi }) {
       setNotices(all);
     } finally {
       pending.current = false;
+      batchAbort.current = null;
       setBusy(false);
     }
   };

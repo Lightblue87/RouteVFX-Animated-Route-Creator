@@ -37,6 +37,8 @@ export function createOrsProxyProvider(proxyUrl: string, fetchImpl: typeof fetch
       // Client-seitige Drosselung: höchstens 1 Anfrage pro Sekunde (schont das gemeinsame Tageskontingent).
       const wait = lastCall + 1000 - Date.now();
       if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+      // Nach der Wartezeit: Wurde die Anfrage inzwischen abgebrochen (z. B. Einwilligung widerrufen), nichts senden.
+      if (signal?.aborted) throw new RoutingError('aborted', 'aborted');
       lastCall = Date.now();
       let res: Response;
       try {

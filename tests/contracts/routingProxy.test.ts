@@ -159,6 +159,17 @@ describe('ORS-Proxy-Adapter (Client)', () => {
     expect(out.fallbackReason).toBe('proxy_origin_not_allowed');
     expect(out.results[0]!.confidence).toBe('estimated');
   });
+  it('sends nothing when the request is aborted while waiting in the client throttle', async () => {
+    const fetchMock = vi.fn(async () => res({ routes: [{ coordinates: [[9.7, 52.3], [10.5, 52.2]], distanceM: 1, durationS: 1 }], attribution: ORS_ATTRIBUTION }));
+    const p = createOrsProxyProvider('https://x', fetchMock as unknown as typeof fetch);
+    await p.route({ start: H, end: B, via: [], mode: 'car' });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const ctl = new AbortController();
+    const second = p.route({ start: H, end: B, via: [], mode: 'car' }, ctl.signal);
+    setTimeout(() => ctl.abort(), 100); // während der ~1-s-Drosselung
+    await expect(second).rejects.toMatchObject({ code: 'aborted' });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
   it('rejects unsupported modes without a request', async () => {
     const fetchMock = vi.fn();
     const p = createOrsProxyProvider('https://x', fetchMock as unknown as typeof fetch);
