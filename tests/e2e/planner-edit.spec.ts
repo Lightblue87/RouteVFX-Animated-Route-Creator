@@ -67,6 +67,10 @@ test('Linie bearbeiten im Querformat: „Fertig“ bleibt erreichbar (Karte fül
   // Entweder scrollt die Karte normal mit, oder für Liste/Leiste bleibt mindestens ein Drittel der Fläche
   if (sticky) expect(scrollH - mapH - barH).toBeGreaterThan(scrollH / 3);
   await body.evaluate((el) => el.scrollTo(0, 300));
+  await page.waitForTimeout(200);
+  // Die Leiste klebt oben an der Scrollfläche (nicht auf halber Höhe über der Liste)
+  const barBox = (await page.getByTestId('edit-done').locator('..').boundingBox())!;
+  expect(barBox.y - (await body.boundingBox())!.y).toBeLessThan(8);
   // Normales Klicken (ohne force) muss gelingen – schlägt fehl, wenn die Karte die Leiste verdeckt
   await page.getByTestId('edit-done').click({ timeout: 5000 });
   await expect(map).not.toHaveClass(/editing/);
