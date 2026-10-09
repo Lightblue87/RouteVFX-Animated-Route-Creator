@@ -152,6 +152,9 @@ describe('ORS-Proxy-Adapter (Client)', () => {
     expect(await detail(422, 'too_long')).toBe('too_long');
     expect(await detail(503, 'quota_unavailable')).toBe('quota_unavailable');
     expect(await detail(500, 'Not JSON!')).toBeUndefined();
+    // Browser-blockierte Antwort (CORS) / offline: kein lesbarer Body, aber ein diagnostischer Hinweis
+    const blocked = createOrsProxyProvider('https://x', (async () => { throw new TypeError('Failed to fetch'); }) as unknown as typeof fetch);
+    await expect(blocked.route({ start: H, end: B, via: [], mode: 'car' })).rejects.toMatchObject({ code: 'network', detail: 'cors_or_offline' });
     const out = await routeSegment({ start: H, end: B, via: [], mode: 'car' }, { onlineAllowed: true, online: mk(403, 'origin_not_allowed') });
     expect(out.fallbackReason).toBe('proxy_origin_not_allowed');
     expect(out.results[0]!.confidence).toBe('estimated');

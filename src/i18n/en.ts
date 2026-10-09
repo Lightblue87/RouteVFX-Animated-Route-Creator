@@ -73,6 +73,7 @@ export const en: Record<keyof typeof de, string> = {
   'warn.rate_limited': 'Routing service busy – approximation used.',
   'warn.invalid_response': 'Invalid routing response – approximation used.',
   'warn.disabled': 'Routing service is switched off – approximation used.',
+  'warn.proxy_cors_or_offline': "Routing service unreachable: no connection, or the app address is not allowed in the proxy (setting “ROUTING_ALLOWED_ORIGINS”) – approximation used.",
   'warn.proxy_origin_not_allowed': 'The routing service does not allow this app address (proxy setting “ROUTING_ALLOWED_ORIGINS”) – approximation used.',
   'warn.proxy_disabled': 'The routing service is switched off or not fully set up – approximation used.',
   'warn.proxy_quota_unavailable': 'The routing service quota check is not set up – approximation used.',

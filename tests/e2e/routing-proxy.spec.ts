@@ -77,7 +77,8 @@ test('Hinweis-Karte: Straßenroute per Knopf, konkrete Fehlerursache, erneuter V
     const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'content-type' };
     if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
     calls++;
-    if (fail) return route.fulfill({ status: 403, json: { error: 'origin_not_allowed' }, headers: cors });
+    // Wie der Browser bei falscher Origin: Preflight ohne CORS-Header → Anfrage scheitert, kein lesbarer Body.
+    if (fail) return route.abort('failed');
     const [a, b] = req.postDataJSON().coordinates as number[][];
     return route.fulfill({ status: 200, headers: cors, json: { routes: [{ coordinates: [a, [(a![0]! + b![0]!) / 2, (a![1]! + b![1]!) / 2 + 0.05], b], distanceM: 68488.5, durationS: 3058.7 }], attribution: ATTRIBUTION } });
   });
@@ -87,7 +88,7 @@ test('Hinweis-Karte: Straßenroute per Knopf, konkrete Fehlerursache, erneuter V
   await expect(page.getByTestId('segment-confidence')).toHaveText(/Geschätzt|Estimated/);
   expect(calls).toBe(0);
 
-  // Hinweis mit Knopf; Klick erlaubt Online-Dienst und berechnet nach – hier mit Fehlerursache
+  // Hinweis mit Knopf; Klick erlaubt Online-Dienst und berechnet nach – hier mit möglicher Fehlerursache
   await page.getByTestId('compute-roads').click();
   await expect(toggle).toBeChecked();
   await expect(page.getByTestId('segment')).toContainText(/ROUTING_ALLOWED_ORIGINS/);

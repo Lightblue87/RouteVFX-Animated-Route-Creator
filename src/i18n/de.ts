@@ -71,6 +71,7 @@ export const de = {
   'warn.rate_limited': 'Routingdienst ausgelastet – Näherung verwendet.',
   'warn.invalid_response': 'Ungültige Routing-Antwort – Näherung verwendet.',
   'warn.disabled': 'Routingdienst ist abgeschaltet – Näherung verwendet.',
+  'warn.proxy_cors_or_offline': "Routingdienst nicht erreichbar: keine Verbindung, oder die App-Adresse ist im Proxy nicht erlaubt (Einstellung „ROUTING_ALLOWED_ORIGINS“) – Näherung verwendet.",
   'warn.proxy_origin_not_allowed': 'Der Routingdienst erlaubt diese App-Adresse nicht (Einstellung „ROUTING_ALLOWED_ORIGINS“ im Proxy) – Näherung verwendet.',
   'warn.proxy_disabled': 'Der Routingdienst ist abgeschaltet oder nicht fertig eingerichtet – Näherung verwendet.',
   'warn.proxy_quota_unavailable': 'Die Kontingentprüfung des Routingdienstes ist nicht eingerichtet – Näherung verwendet.',

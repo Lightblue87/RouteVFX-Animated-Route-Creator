@@ -48,7 +48,9 @@ export function createOrsProxyProvider(proxyUrl: string, fetchImpl: typeof fetch
         });
       } catch (e) {
         if ((e as Error).name === 'AbortError') throw new RoutingError('aborted', 'aborted');
-        throw new RoutingError('network', (e as Error).message);
+        // Eine vom Browser blockierte Antwort (CORS, z. B. bei falscher ROUTING_ALLOWED_ORIGINS) ist von „offline“ nicht zu
+        // unterscheiden – der Hinweis nennt deshalb beide möglichen Ursachen.
+        throw new RoutingError('network', (e as Error).message, 'cors_or_offline');
       }
       if (!res.ok) {
         // Der Proxy nennt die Ursache als { error: "<code>" } – nur bekannte Kürzel übernehmen.
