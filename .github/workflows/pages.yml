@@ -1,6 +1,7 @@
 name: Test-Deployment (GitHub Pages)
 
-# Nur von Hand startbar (Actions → „Test-Deployment (GitHub Pages)“ → Run workflow) und nur vom Stand auf main.
+# Nur von Hand startbar (Actions → „Test-Deployment (GitHub Pages)“ → Run workflow) und nur von den Branches main
+# (Stand nach dem Merge) und test (Vorab-Test eines Branches vor dem Merge; Tab-Titel mit „[TEST]“).
 # Veröffentlicht die Prototyp-App unter https://<konto>.github.io/<repo>/ zum Selbsttesten (nicht indexierbar).
 # Voraussetzungen siehe docs/TEST_DEPLOYMENT.md.
 on:
@@ -17,7 +18,7 @@ concurrency:
 
 jobs:
   deploy:
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/test'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -39,6 +40,7 @@ jobs:
           VITE_ROUTING_PROXY_URL: ${{ vars.ROUTING_PROXY_URL }}
       - name: Als Testversion kennzeichnen (nicht indexieren)
         run: |
+          if [ "$GITHUB_REF" = "refs/heads/test" ]; then sed -i 's#<title>#<title>[TEST] #' dist/index.html; grep -q '\[TEST\]' dist/index.html; fi
           grep -q '<meta charset="UTF-8" />' dist/index.html
           sed -i 's#<meta charset="UTF-8" />#<meta charset="UTF-8" />\n    <meta name="robots" content="noindex, nofollow" />#' dist/index.html
           grep -q 'name="robots"' dist/index.html
