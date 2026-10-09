@@ -207,3 +207,41 @@ test('Stopp während der Sammelberechnung entfernt: fehlende Verbindung wird dan
   // Nach Abschluss der Sammelberechnung muss die neue Verbindung Hannover → Bielefeld berechnet werden
   await expect(page.getByTestId('segment')).toHaveCount(1, { timeout: 15_000 });
 });
+
+test('Tabwechsel bricht die Sammelberechnung ab; Enter in der Suche entsperrt den Moduswechsel nicht', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('create-project').click();
+  const toggle = page.getByTestId('online-toggle');
+  test.skip(!/Supabase/.test((await toggle.locator('..').textContent()) ?? ''), 'Build ohne VITE_ROUTING_PROXY_URL');
+
+  let calls = 0;
+  await page.context().route(PROXY, async (route) => {
+    const req = route.request();
+    const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'content-type' };
+    if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
+    calls++;
+    await new Promise((r) => setTimeout(r, 1500));
+    const [a, b] = req.postDataJSON().coordinates as number[][];
+    return route.fulfill({ status: 200, headers: cors, json: { routes: [{ coordinates: [a, b], distanceM: 1000, durationS: 60 }], attribution: ATTRIBUTION } });
+  });
+  await page.context().route(/nominatim\.openstreetmap\.org/, (route) =>
+    route.fulfill({ status: 200, headers: { 'Access-Control-Allow-Origin': '*' }, json: [] }),
+  );
+
+  await addPlace(page, 'Hannover', /Hannover|Hanover/);
+  await addPlace(page, 'Braunschweig', /Braunschweig/);
+  await addPlace(page, 'Bielefeld', /Bielefeld/);
+  await expect(page.getByTestId('segment')).toHaveCount(2);
+
+  await toggle.check(); // Sammelberechnung läuft (erste Antwort 1,5 s verzögert)
+  await expect.poll(() => calls).toBe(1);
+  // Online-Suche per Enter setzt das allgemeine „busy“ zurück – der Moduswechsel muss trotzdem gesperrt bleiben
+  await page.getByTestId('place-search').fill('Ham');
+  await page.getByTestId('place-search').press('Enter');
+  await page.waitForTimeout(300);
+  await expect(page.getByTestId('segment-mode').first()).toBeDisabled();
+  // Tab verlassen → Berechnung wird abgebrochen, es folgt keine weitere Anfrage
+  await page.getByTestId('tab-animate').click();
+  await page.waitForTimeout(3000);
+  expect(calls).toBe(1);
+});

@@ -37,6 +37,10 @@ export function RoutePanel({ api }: { api: ProjectApi }) {
   // Aktuelle Einwilligung, auch für laufende Sammelberechnungen: ein Widerruf stoppt weitere Übertragungen sofort.
   const consent = useRef(online);
   const batchAbort = useRef<AbortController | null>(null);
+  // Eigener Zustand der Sammelberechnung (unabhängig vom allgemeinen `busy`, das andere Abläufe zurücksetzen).
+  const [batching, setBatching] = useState(false);
+  // Panel wird verlassen (Tabwechsel): laufende Sammelberechnung abbrechen, damit nach einem späteren Widerruf nichts mehr gesendet wird.
+  useEffect(() => () => batchAbort.current?.abort(), []);
   const setOnline = (v: boolean) => {
     consent.current = v;
     if (!v) batchAbort.current?.abort(); // auch eine in der Drosselung wartende Anfrage wird nicht mehr gesendet
@@ -166,6 +170,7 @@ export function RoutePanel({ api }: { api: ProjectApi }) {
     if (pending.current || estimatedRoad.length === 0) return;
     pending.current = true;
     setBusy(true);
+    setBatching(true);
     try {
       const allowed: RoutingSettings = { onlineAllowed: true, online: onlineRouting };
       const done: { base: RouteSegment; segment: RouteSegment }[] = [];
@@ -194,6 +199,7 @@ export function RoutePanel({ api }: { api: ProjectApi }) {
     } finally {
       pending.current = false;
       batchAbort.current = null;
+      setBatching(false);
       setBusy(false);
       setRecheck((n) => n + 1);
     }
@@ -273,7 +279,7 @@ export function RoutePanel({ api }: { api: ProjectApi }) {
                 )}
                 {seg && (
                   <div className={`segment conf-${seg.confidence}`} data-testid="segment">
-                    <select value={seg.mode} onChange={(e) => setMode(seg.id, e.target.value as TransportMode)} disabled={busy} aria-label={t('route.segment', { n: i + 1 })} data-testid="segment-mode">
+                    <select value={seg.mode} onChange={(e) => setMode(seg.id, e.target.value as TransportMode)} disabled={busy || batching} aria-label={t('route.segment', { n: i + 1 })} data-testid="segment-mode">
                       {TRANSPORT_MODES.map((m) => <option key={m} value={m}>{t(`mode.${m}`)}</option>)}
                     </select>
                     <span className="small">{formatKm(locale, seg.distanceM)}</span>
