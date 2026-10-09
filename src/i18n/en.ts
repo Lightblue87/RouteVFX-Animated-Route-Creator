@@ -43,7 +43,7 @@ export const en: Record<keyof typeof de, string> = {
   'route.editLine': 'Edit line',
   'route.editHint': 'Drag points to correct the line. Dragging small points inserts new ones; tapping removes them.',
   'route.editDone': 'Done',
-  'route.roadsHint': 'This leg is only a straight-line approximation. Real road/path routes need the online routing service (openrouteservice via our proxy); the coordinates of start, waypoints and destination are transmitted.',
+  'route.roadsHint': 'This leg is only a straight-line approximation. Real road/path routes need the online routing service ({router}); the coordinates of start, waypoints and destination are transmitted.',
   'route.computeRoads': 'Compute road route (allow online service)',
   'route.retryRoads': 'Retry road route',
   'route.pauseS': 'Pause (s)',

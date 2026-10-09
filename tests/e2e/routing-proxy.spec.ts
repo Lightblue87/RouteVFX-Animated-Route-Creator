@@ -94,9 +94,17 @@ test('Hinweis-Karte: Straßenroute per Knopf, konkrete Fehlerursache, erneuter V
   await expect(page.getByTestId('segment')).toContainText(/ROUTING_ALLOWED_ORIGINS/);
   await expect(page.getByTestId('segment-confidence')).toHaveText(/Geschätzt|Estimated/);
 
+  // Eigene Linienart bleibt beim späteren Berechnen erhalten
+  await page.getByTestId('tab-animate').click();
+  const kind = page.locator('select[aria-label]').filter({ has: page.locator('option[value="dashed"]') }).first();
+  await kind.selectOption('full');
+  await page.getByTestId('tab-route').click();
+
   // Ursache behoben → erneuter Versuch liefert die Anbieterroute
   fail = false;
   await page.getByTestId('compute-roads').click();
   await expect(page.getByTestId('segment-confidence')).toHaveText(/Anbieterroute|Provider route/);
   await expect(page.getByTestId('compute-roads')).toHaveCount(0);
+  await page.getByTestId('tab-animate').click();
+  await expect(kind).toHaveValue('full');
 });

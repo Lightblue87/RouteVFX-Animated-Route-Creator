@@ -41,7 +41,7 @@ export const de = {
   'route.editLine': 'Linie bearbeiten',
   'route.editHint': 'Punkte ziehen, um die Linie zu korrigieren. Kleine Punkte ziehen fügt Punkte ein, Antippen entfernt sie.',
   'route.editDone': 'Fertig',
-  'route.roadsHint': 'Diese Strecke ist nur eine gerade Näherung. Für echte Straßen-/Wegrouten muss der Online-Routingdienst (openrouteservice, über unseren Proxy) genutzt werden; dabei werden die Koordinaten von Start, Wegpunkten und Ziel übertragen.',
+  'route.roadsHint': 'Diese Strecke ist nur eine gerade Näherung. Für echte Straßen-/Wegrouten muss der Online-Routingdienst ({router}) genutzt werden; dabei werden die Koordinaten von Start, Wegpunkten und Ziel übertragen.',
   'route.computeRoads': 'Straßenroute berechnen (Online-Dienst erlauben)',
   'route.retryRoads': 'Straßenroute erneut versuchen',
   'route.pauseS': 'Pause (s)',

@@ -13,6 +13,7 @@ import { formatKm, type MessageKey } from '../i18n';
 
 const ONLINE_KEY = 'arc.onlineAllowed';
 const onlineRouting = createOnlineRoutingProvider();
+const ROUTER_NAME = onlineRouting.id === 'ors-proxy' ? 'openrouteservice (HeiGIT) · Supabase' : 'FOSSGIS-OSRM';
 
 export function useOnlineSetting(): [boolean, (v: boolean) => void] {
   const [v, setV] = useState(() => {
@@ -165,7 +166,8 @@ export function RoutePanel({ api }: { api: ProjectApi }) {
         if (!r) continue;
         used ||= r.usedOnline;
         all.push(...r.notices);
-        done.push({ base: r.base, segment: r.segment });
+        // Gleiches Verkehrsmittel: Farbe/Linienart/Breite des Nutzers bleiben vollständig erhalten.
+        done.push({ base: r.base, segment: { ...r.segment, lineStyle: r.base.lineStyle } });
       }
       if (used) commitDerived(markOnlineUsed);
       if (done.length) commit((cur) => done.reduce((acc, d) => replaceSegmentIfUnchanged(acc, d.base, d.segment), cur));
@@ -250,7 +252,7 @@ export function RoutePanel({ api }: { api: ProjectApi }) {
                 )}
                 {seg && (
                   <div className={`segment conf-${seg.confidence}`} data-testid="segment">
-                    <select value={seg.mode} onChange={(e) => setMode(seg.id, e.target.value as TransportMode)} aria-label={t('route.segment', { n: i + 1 })} data-testid="segment-mode">
+                    <select value={seg.mode} onChange={(e) => setMode(seg.id, e.target.value as TransportMode)} disabled={busy} aria-label={t('route.segment', { n: i + 1 })} data-testid="segment-mode">
                       {TRANSPORT_MODES.map((m) => <option key={m} value={m}>{t(`mode.${m}`)}</option>)}
                     </select>
                     <span className="small">{formatKm(locale, seg.distanceM)}</span>
@@ -278,7 +280,7 @@ export function RoutePanel({ api }: { api: ProjectApi }) {
         </ol>
         {estimatedRoad.length > 0 && (
           <div className="card" role="status">
-            {!online && <p className="small">{t('route.roadsHint')}</p>}
+            {!online && <p className="small">{t('route.roadsHint', { router: ROUTER_NAME })}</p>}
             <button className="btn primary small" onClick={() => { setOnline(true); void recomputeRoads(); }} disabled={busy} data-testid="compute-roads">
               {online ? t('route.retryRoads') : t('route.computeRoads')}
             </button>
@@ -286,7 +288,7 @@ export function RoutePanel({ api }: { api: ProjectApi }) {
         )}
         <label className="toggle small">
           <input type="checkbox" checked={online} onChange={(e) => { setOnline(e.target.checked); if (e.target.checked) void recomputeRoads(); }} data-testid="online-toggle" />
-          {t('route.onlineToggle', { router: onlineRouting.id === 'ors-proxy' ? 'openrouteservice (HeiGIT) · Supabase' : 'FOSSGIS-OSRM' })}
+          {t('route.onlineToggle', { router: ROUTER_NAME })}
         </label>
       </div>
     </div>
