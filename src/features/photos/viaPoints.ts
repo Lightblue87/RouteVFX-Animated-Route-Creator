@@ -25,7 +25,7 @@ export function clusterRadiusM(totalRouteM: number): number {
  * Stellvertreter ist der Punkt, der dem Schwerpunkt am nächsten liegt – ein echter Foto-Ort statt eines berechneten
  * Mittelpunkts, der abseits jeder Straße liegen könnte.
  */
-export function clusterPoints(points: GeoPoint[], radiusM: number): { rep: GeoPoint; members: number[] }[] {
+export function clusterPoints(points: GeoPoint[], radiusM: number): { rep: GeoPoint; repIndex: number; members: number[] }[] {
   const groups: number[][] = [];
   points.forEach((p, i) => {
     const g = groups.find((m) => haversineM(points[m[0]!]!, p) <= radiusM);
@@ -37,7 +37,7 @@ export function clusterPoints(points: GeoPoint[], radiusM: number): { rep: GeoPo
     const lon = members.reduce((a, i) => a + points[i]!.lon, 0) / members.length;
     const c = { lat, lon };
     const best = members.reduce((b, i) => (haversineM(points[i]!, c) < haversineM(points[b]!, c) ? i : b), members[0]!);
-    return { rep: { lat: points[best]!.lat, lon: points[best]!.lon }, members };
+    return { rep: { lat: points[best]!.lat, lon: points[best]!.lon }, repIndex: best, members };
   });
 }
 
@@ -64,36 +64,34 @@ export function planPhotoVias(p: Project): ViaPlan {
   if (!placed.length || !segs.length) return { bySegment, merged: 0 };
   const total = p.journey.segments.reduce((a, s) => a + s.distanceM, 0);
   const lines = segs.map((s) => ({ seg: s, index: indexLine(unwrapLongitudes(selectedGeometry(s))) }));
-  const radiusAt = (r: number) => clusterPoints(placed.map((x) => x.position), r);
 
-  const assign = (clusters: { rep: GeoPoint }[]) => {
-    const per = new Map<string, { pt: GeoPoint; along: number }[]>();
-    for (const c of clusters) {
-      let best: { id: string; d: number; along: number; lim: number } | null = null;
-      for (const { seg, index } of lines) {
-        const n = nearestOnLine(index, c.rep);
-        if (!n) continue;
-        const lim = Math.min(CORRIDOR_MAX_M, Math.max(CORRIDOR_MIN_M, seg.distanceM * CORRIDOR_FRACTION));
-        if (n.distanceM <= lim && (!best || n.distanceM < best.d)) best = { id: seg.id, d: n.distanceM, along: n.alongM, lim };
-      }
-      if (best) per.set(best.id, [...(per.get(best.id) ?? []), { pt: c.rep, along: best.along }]);
+  // 1) Jedes Foto einzeln dem nächstgelegenen Abschnitt zuordnen, sofern es in dessen Korridor liegt.
+  const assigned = new Map<string, { pt: GeoPoint; along: number }[]>();
+  for (const photo of placed) {
+    let best: { id: string; d: number; along: number } | null = null;
+    for (const { seg, index } of lines) {
+      const n = nearestOnLine(index, photo.position);
+      if (!n) continue;
+      const lim = Math.min(CORRIDOR_MAX_M, Math.max(CORRIDOR_MIN_M, seg.distanceM * CORRIDOR_FRACTION));
+      if (n.distanceM <= lim && (!best || n.distanceM < best.d)) best = { id: seg.id, d: n.distanceM, along: n.alongM };
     }
-    return per;
-  };
+    if (best) assigned.set(best.id, [...(assigned.get(best.id) ?? []), { pt: photo.position, along: best.along }]);
+  }
 
-  // Mehr Orte als der Anbieter zulässt: Radius verdoppeln, bis es passt (nahe Bereiche werden zu einem Ort).
-  let radius = clusterRadiusM(total);
-  let clusters = radiusAt(radius);
-  let per = assign(clusters);
-  for (let i = 0; i < 6 && [...per.values()].some((v) => v.length > MAX_VIA_PER_SEGMENT); i++) {
-    radius *= 2;
-    clusters = radiusAt(radius);
-    per = assign(clusters);
+  // 2) Erst danach je Abschnitt zusammenfassen: Ein Foto außerhalb des Korridors kann gültige nicht mehr verdrängen.
+  //    Mehr Orte als der Anbieter zulässt: Radius verdoppeln, bis es passt (nahe Bereiche werden zu einem Ort).
+  let merged = 0;
+  for (const [id, items] of assigned) {
+    let radius = clusterRadiusM(total);
+    let clusters = clusterPoints(items.map((x) => x.pt), radius);
+    for (let i = 0; i < 6 && clusters.length > MAX_VIA_PER_SEGMENT; i++) {
+      radius *= 2;
+      clusters = clusterPoints(items.map((x) => x.pt), radius);
+    }
+    merged += items.length - clusters.length;
+    bySegment.set(id, clusters.map((c) => ({ pt: c.rep, along: items[c.repIndex]!.along })).sort((a, b) => a.along - b.along).slice(0, MAX_VIA_PER_SEGMENT).map((x) => x.pt));
   }
-  for (const [id, v] of per) {
-    bySegment.set(id, v.sort((a, b) => a.along - b.along).slice(0, MAX_VIA_PER_SEGMENT).map((x) => x.pt));
-  }
-  return { bySegment, merged: placed.length - clusters.length };
+  return { bySegment, merged };
 }
 
 const same = (a: GeoPoint[], b: GeoPoint[]) =>

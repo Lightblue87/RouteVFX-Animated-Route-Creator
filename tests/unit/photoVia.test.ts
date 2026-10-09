@@ -83,6 +83,16 @@ describe('Foto-Orte als Routen-Zwischenpunkte', () => {
     expect(planPhotoVias(p).bySegment.get('s1')).toHaveLength(1);
   });
 
+  it('ein Foto außerhalb des Korridors verdrängt ein gültiges Foto nicht (erst zuordnen, dann zusammenfassen)', () => {
+    // Langer Gesamtweg → großer Radius (≥ 10 km). Kurzer Abschnitt (Korridor 1 km): gültiges Foto 0,5 km neben der Linie,
+    // zweites Foto 8 km entfernt (im selben Cluster, aber außerhalb des Korridors).
+    const p = proj([[52.07, 12.0], [52.0045, 12]], { distanceM: 6_000, geometry: line([52, 11.9], [52, 12.1]) });
+    p.journey.segments.push({ ...p.journey.segments[0]!, id: 's2', distanceM: 700_000, geometry: line([40, 9], [40, 19]) });
+    const v = planPhotoVias(p).bySegment.get('s1');
+    expect(v).toHaveLength(1);
+    expect(v![0]!.lat).toBeCloseTo(52.0045, 4);
+  });
+
   it('meldet Abschnitte nur, wenn die gespeicherten Zwischenpunkte abweichen', () => {
     const p = proj([[52.1, 12]]);
     const need = segmentsNeedingVia(p);
