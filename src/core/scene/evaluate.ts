@@ -139,19 +139,30 @@ function schedulePhotos(project: Project, plan: TimelinePlan, segments: { index:
     found.push({ photoId: photo.id, at: mv.startMs + invSmooth(Math.min(1, Math.max(0, f))) * (mv.endMs - mv.startMs), hold: photo.holdMs, distanceToRouteM: b.distanceM });
   }
   found.sort((a, b) => a.at - b.at);
-  const out: PhotoMoment[] = [];
-  let cursor = 0;
+  const GAP_MS = 150;
   const limit = plan.totalMs - 100;
-  for (const f of found) {
-    // Die eingestellte Anzeigedauer bleibt voll erhalten: Reicht das Videoende nicht, beginnt das Foto früher
-    // (nie vor dem vorigen Foto); passt es auch dann nicht, wird es weggelassen statt verkürzt gezeigt.
-    const startMs = Math.min(Math.max(f.at, cursor), Math.max(cursor, limit - f.hold));
-    const endMs = startMs + f.hold;
-    if (endMs > limit) continue;
-    out.push({ photoId: f.photoId, startMs, endMs, distanceToRouteM: f.distanceToRouteM });
-    cursor = endMs + 150;
+  // Voller Anzeigedauer wegen: Spätestmöglicher Start rückwärts vom Videoende, damit mehrere Fotos am Ende gemeinsam
+  // Platz finden. Passt ein Foto auch dann nicht (Start vor dem Ende des vorigen), entfällt es – nie verkürzt.
+  let items = found;
+  for (;;) {
+    const latest: number[] = [];
+    for (let i = items.length - 1; i >= 0; i--) latest[i] = (i === items.length - 1 ? limit : latest[i + 1]! - GAP_MS) - items[i]!.hold;
+    const out: PhotoMoment[] = [];
+    let cursor = 0;
+    let dropped = -1;
+    for (let i = 0; i < items.length; i++) {
+      const startMs = Math.min(Math.max(items[i]!.at, cursor), latest[i]!);
+      if (startMs < cursor) {
+        dropped = i;
+        break;
+      }
+      const endMs = startMs + items[i]!.hold;
+      out.push({ photoId: items[i]!.photoId, startMs, endMs, distanceToRouteM: items[i]!.distanceToRouteM });
+      cursor = endMs + GAP_MS;
+    }
+    if (dropped < 0) return out;
+    items = items.filter((_, i) => i !== dropped);
   }
-  return out;
 }
 
 interface Progress {

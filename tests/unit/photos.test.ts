@@ -103,4 +103,15 @@ describe('Fotos auf der Route', () => {
     const short = buildSceneModel((await withPhotos((mm) => [photo(at(mm, 2, 1), { holdMs: 6000 })], 5000)).p);
     for (const x of short.photoMoments) expect(x.endMs - x.startMs).toBe(6000);
   });
+
+  it('Mehrere Fotos am Videoende: alle, die zusammen passen, bleiben erhalten (rückwärts eingeplant)', async () => {
+    const { p } = await withPhotos((m) => [photo(at(m, 2, 0.99), { holdMs: 2000 }), photo(at(m, 2, 1), { holdMs: 2000 })]);
+    const model = buildSceneModel(p);
+    expect(model.photoMoments).toHaveLength(2);
+    const [a, b] = model.photoMoments;
+    expect(a!.endMs - a!.startMs).toBe(2000);
+    expect(b!.endMs - b!.startMs).toBe(2000);
+    expect(b!.startMs).toBeGreaterThanOrEqual(a!.endMs);
+    expect(b!.endMs).toBeLessThanOrEqual(model.plan.totalMs - 100);
+  });
 });
