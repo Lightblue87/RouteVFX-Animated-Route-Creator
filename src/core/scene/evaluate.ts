@@ -143,9 +143,11 @@ function schedulePhotos(project: Project, plan: TimelinePlan, segments: { index:
   let cursor = 0;
   const limit = plan.totalMs - 100;
   for (const f of found) {
-    const startMs = Math.max(f.at, cursor);
-    const endMs = Math.min(startMs + f.hold, limit);
-    if (endMs - startMs < 500) continue; // zu wenig Platz am Ende des Videos
+    // Die eingestellte Anzeigedauer bleibt voll erhalten: Reicht das Videoende nicht, beginnt das Foto früher
+    // (nie vor dem vorigen Foto); passt es auch dann nicht, wird es weggelassen statt verkürzt gezeigt.
+    const startMs = Math.min(Math.max(f.at, cursor), Math.max(cursor, limit - f.hold));
+    const endMs = startMs + f.hold;
+    if (endMs > limit) continue;
     out.push({ photoId: f.photoId, startMs, endMs, distanceToRouteM: f.distanceToRouteM });
     cursor = endMs + 150;
   }

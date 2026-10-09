@@ -92,4 +92,15 @@ describe('Fotos auf der Route', () => {
     const model = buildSceneModel(p);
     for (const m of model.photoMoments) expect(m.endMs).toBeLessThanOrEqual(model.plan.totalMs);
   });
+
+  it('Anzeigedauer bleibt voll erhalten: Foto am Ziel beginnt früher statt verkürzt zu werden; passt es nicht, entfällt es', async () => {
+    const { p } = await withPhotos((m) => [photo(at(m, 2, 1), { holdMs: 3000 })]);
+    const model = buildSceneModel(p);
+    expect(model.photoMoments).toHaveLength(1);
+    const m = model.photoMoments[0]!;
+    expect(m.endMs - m.startMs).toBe(3000);
+    expect(m.endMs).toBeLessThanOrEqual(model.plan.totalMs - 100);
+    const short = buildSceneModel((await withPhotos((mm) => [photo(at(mm, 2, 1), { holdMs: 6000 })], 5000)).p);
+    for (const x of short.photoMoments) expect(x.endMs - x.startMs).toBe(6000);
+  });
 });
