@@ -37,7 +37,7 @@ export function createOrsProxyProvider(proxyUrl: string, fetchImpl: typeof fetch
       // Alternativrouten haben beim Anbieter ein deutlich kleineres Distanzlimit als die Hauptroute. Lehnt er die Anfrage
       // mit Alternativen ab, wird einmal ohne Alternativen wiederholt (Hauptroute statt gerader Näherung).
       try {
-        return await send(req, points, !!req.alternatives, signal);
+        return await send(req, points, !!req.alternatives && points.length === 2, signal);
       } catch (e) {
         // Nur im Zwei-Punkte-Fall: Mit Wegpunkten sendet der Proxy keine Alternativen, ein Wiederholen änderte nichts.
         if (req.alternatives && req.via.length === 0 && e instanceof RoutingError && (e.detail === 'upstream' || e.detail === 'too_long')) return send(req, points, false, signal);

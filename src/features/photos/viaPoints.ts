@@ -99,8 +99,7 @@ const same = (a: GeoPoint[], b: GeoPoint[]) =>
   a.length === b.length && a.every((p, i) => Math.abs(p.lat - b[i]!.lat) < 1e-6 && Math.abs(p.lon - b[i]!.lon) < 1e-6);
 
 /** Abschnitte, deren gespeicherte Zwischenpunkte nicht zu den Foto-Orten passen (Neuberechnung nötig). */
-export function segmentsNeedingVia(p: Project): { segment: RouteSegment; via: GeoPoint[] }[] {
-  const plan = planPhotoVias(p);
+export function segmentsNeedingVia(p: Project, plan: ViaPlan = planPhotoVias(p)): { segment: RouteSegment; via: GeoPoint[] }[] {
   return p.journey.segments
     .filter(segmentAcceptsVia)
     .map((segment) => ({ segment, via: plan.bySegment.get(segment.id) ?? [] }))

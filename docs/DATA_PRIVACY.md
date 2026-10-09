@@ -40,3 +40,4 @@ Nach erstmaliger Nutzung eines Online-Dienstes wird `privacy.usedOnlineServices 
 - Supabase (Auftragsverarbeitung, Region EU wählen) und HeiGIT/openrouteservice in die Datenschutzerklärung aufnehmen; AV-Vertrag mit Supabase prüfen (E14).
 - GPS-Aufzeichnung (nicht implementiert): Berechtigung nur auf Nutzeraktion, Daten nur lokal.
 - Mikrofon (Voice-over, nicht implementiert): nur auf Anforderung.
+- Foto-Routing: Nur nach ausdrücklichem Klick auf „Route über Foto-Orte berechnen“ (und Einwilligung in den Online-Dienst) werden die Foto-Orte als Koordinaten zusammen mit Start und Ziel an den Routingdienst gesendet. Bilder und Dateinamen werden nie übertragen.

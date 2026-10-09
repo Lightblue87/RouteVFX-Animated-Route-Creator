@@ -171,8 +171,11 @@ export function RoutePanel({ api }: { api: ProjectApi }) {
   const ROAD_MODES: TransportMode[] = ['car', 'motorcycle', 'bike', 'walk'];
   const estimatedRoad = project.journey.segments.filter((s) => s.confidence === 'estimated' && ROAD_MODES.includes(s.mode) && onlineRouting.supportedModes.includes(s.mode));
   // Foto-Orte als Zwischenpunkte: Abschnitte, deren Zwischenpunkte nicht zu den Fotos passen.
-  const photoVias = useMemo(() => segmentsNeedingVia(project).filter((x) => onlineRouting.supportedModes.includes(x.segment.mode)), [project]);
-  const viaMerged = useMemo(() => planPhotoVias(project).merged, [project]);
+  // Nur neu berechnen, wenn sich Route oder Foto-Orte ändern (nicht bei Beschriftung/Dauer): lange GPX-Routen sind teuer.
+  const photoKey = project.photos.map((x) => (x.position ? `${x.position.lat},${x.position.lon}` : '-')).join('|');
+  const viaPlan = useMemo(() => planPhotoVias(project), [project.journey, photoKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const photoVias = useMemo(() => segmentsNeedingVia(project, viaPlan).filter((x) => onlineRouting.supportedModes.includes(x.segment.mode)), [project.journey, viaPlan]); // eslint-disable-line react-hooks/exhaustive-deps
+  const viaMerged = viaPlan.merged;
   const runBatch = async (jobs: { seg: RouteSegment; via: GeoPoint[] }[]) => {
     if (pending.current || jobs.length === 0) return;
     pending.current = true;
@@ -213,7 +216,7 @@ export function RoutePanel({ api }: { api: ProjectApi }) {
       setRecheck((n) => n + 1);
     }
   };
-  const viaFor = (seg: RouteSegment) => planPhotoVias(project).bySegment.get(seg.id) ?? [];
+  const viaFor = (seg: RouteSegment) => viaPlan.bySegment.get(seg.id) ?? [];
   const recomputeRoads = () => runBatch(estimatedRoad.map((seg) => ({ seg, via: segmentAcceptsVia(seg) ? viaFor(seg) : [] })));
   const routeThroughPhotos = () => runBatch(photoVias.map(({ segment, via }) => ({ seg: segment, via })));
 
