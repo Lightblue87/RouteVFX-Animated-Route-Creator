@@ -1,6 +1,7 @@
 // Supabase Edge Function „route“ (Deno). Logik in handler.ts; hier nur Umgebung und Datenbank-Anbindung.
 // Secrets (supabase secrets set …): ORS_API_KEY, ROUTING_ALLOWED_ORIGINS, ROUTING_ENABLED, ROUTING_QUOTA_SALT,
-// optional ROUTING_PER_CLIENT_DAILY (Standard 50), ROUTING_GLOBAL_DAILY (Standard 1800, unter dem ORS-Limit 2000).
+// optional ROUTING_PER_CLIENT_DAILY (Standard 50), ROUTING_GLOBAL_DAILY (Standard 1800, unter dem ORS-Limit 2000),
+// ORS_BASE_URL (Standard https://api.heigit.org/openrouteservice).
 // SUPABASE_URL und SUPABASE_SERVICE_ROLE_KEY stellt Supabase automatisch bereit.
 import { handleRoute } from './handler.ts';
 
@@ -30,6 +31,7 @@ Deno.serve(async (req) => {
       perClientDaily: Number(env('ROUTING_PER_CLIENT_DAILY', '50')),
       globalDaily: Number(env('ROUTING_GLOBAL_DAILY', '1800')),
       quotaSalt: env('ROUTING_QUOTA_SALT'),
+      orsBaseUrl: env('ORS_BASE_URL'),
     },
     { fetch, takeQuota },
   );

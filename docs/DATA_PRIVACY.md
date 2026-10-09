@@ -11,7 +11,7 @@ Stand: 2026-10-08 (Prototyp, keine Rechtsberatung – rechtliche Prüfung vor Re
 ## Datenflüsse an Dritte (nur nach Opt-in)
 | Ziel | Übertragene Daten | Auslöser | Zweck |
 |---|---|---|---|
-| Supabase Edge Function „route“ (eigenes Projekt, wenn eingerichtet) → api.openrouteservice.org (HeiGIT gGmbH) | Verkehrsmittel, Koordinaten von Start/Wegpunkten/Ziel (6 Nachkommastellen); IP-Adresse nur bei Supabase. In der DB nur täglich wechselnder, gesalzener IP-Hash + Zähler (7 Tage). Keine Koordinaten gespeichert/geloggt; an ORS geht die IP der Function, nicht die des Nutzers | Berechnung eines Auto/Motorrad/Rad/Fuß-Abschnitts (Opt-in) | Straßenroute |
+| Supabase Edge Function „route“ (eigenes Projekt, wenn eingerichtet) → api.heigit.org/openrouteservice (HeiGIT gGmbH) | Verkehrsmittel, Koordinaten von Start/Wegpunkten/Ziel (6 Nachkommastellen); IP-Adresse nur bei Supabase. In der DB nur täglich wechselnder, gesalzener IP-Hash + Zähler (7 Tage). Keine Koordinaten gespeichert/geloggt; an ORS geht die IP der Function, nicht die des Nutzers | Berechnung eines Auto/Motorrad/Rad/Fuß-Abschnitts (Opt-in) | Straßenroute |
 | routing.openstreetmap.de (FOSSGIS) – nur ohne eingerichteten Proxy | Koordinaten von Start/Ziel (6 Nachkommastellen), IP-Adresse, Referer | Berechnung eines Auto/Motorrad/Rad/Fuß-Abschnitts | Straßenroute |
 | nominatim.openstreetmap.org (OSMF) | Suchbegriff, Sprache, IP-Adresse, Referer | Tippen auf „Online suchen“ bzw. Enter | Ortssuche |
 | tiles.openfreemap.org (OpenFreeMap) | Angefragte Kacheln (→ betrachteter Kartenausschnitt), IP-Adresse, Referer; keine Stopps/Tracks, keine Cookies | Auswahl des Kartenstils „OpenFreeMap“ (mit Hinweis im UI) | Detailkarte in Vorschau, Planung und Export |

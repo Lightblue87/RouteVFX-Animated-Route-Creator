@@ -3,7 +3,7 @@
 Stand: 2026-10-08. Ziel: echte Straßen-, Rad- und Fußrouten über **openrouteservice (ORS)**, ohne den ORS-Schlüssel in der App auszuliefern. Laut ORS-FAQ darf ein HeiGIT-Schlüssel nicht clientseitig verwendet werden, deshalb läuft jede Anfrage über eine eigene **Supabase Edge Function** (`supabase/functions/route`).
 
 ```
-App (Browser) ──POST {mode, coordinates}──▶ Supabase Edge Function „route“ ──(ORS-Schlüssel)──▶ api.openrouteservice.org
+App (Browser) ──POST {mode, coordinates}──▶ Supabase Edge Function „route“ ──(ORS-Schlüssel)──▶ api.heigit.org/openrouteservice
                                               │
                                               └─ Tages-Kontingent je Client + gesamt (Tabelle routing_usage)
 ```
@@ -28,7 +28,7 @@ Alles im kostenlosen Rahmen (Supabase Free Plan – laut Drittquellen ohne Zahlu
    supabase secrets set ROUTING_ENABLED=true
    supabase functions deploy route --no-verify-jwt
    ```
-   Optional: `ROUTING_PER_CLIENT_DAILY` (Standard 50), `ROUTING_GLOBAL_DAILY` (Standard 1800).
+   Optional: `ROUTING_PER_CLIENT_DAILY` (Standard 50), `ROUTING_GLOBAL_DAILY` (Standard 1800), `ORS_BASE_URL` (Standard `https://api.heigit.org/openrouteservice`; die alte Adresse `api.openrouteservice.org` wird von HeiGIT abgeschaltet).
 4. **App bauen** mit der öffentlichen Function-URL (kein Geheimnis):
    ```bash
    VITE_ROUTING_PROXY_URL=https://<projekt-ref>.supabase.co/functions/v1/route npm run build
@@ -42,4 +42,4 @@ Alles im kostenlosen Rahmen (Supabase Free Plan – laut Drittquellen ohne Zahlu
 
 ## Getestet / nicht getestet
 - Getestet (Sandbox): Handler-Logik (Vitest), Deno-Typprüfung und echter Deno-Lauf der Function mit simulierter Datenbank, SQL-Migration in eingebettetem Postgres (PGlite).
-- **Nicht getestet:** echtes Supabase-Projekt, echter ORS-Aufruf (Sandbox blockiert `api.openrouteservice.org`), Geräte.
+- **Nicht getestet:** echtes Supabase-Projekt, echter ORS-Aufruf (Sandbox blockiert die ORS-API), Geräte.

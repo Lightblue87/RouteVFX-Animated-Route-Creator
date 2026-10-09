@@ -28,6 +28,8 @@ export interface ProxyEnv {
   globalDaily: number;
   /** Geheimes Salz für den IP-Hash. */
   quotaSalt: string;
+  /** Basis-URL der ORS-API; Standard: neue HeiGIT-Adresse (api.openrouteservice.org wird abgeschaltet). */
+  orsBaseUrl?: string;
 }
 
 export interface ProxyDeps {
@@ -52,7 +54,9 @@ export interface ProxyRoute {
 
 export const MAX_BODY_BYTES = 4096;
 export const MAX_POINTS = 5;
-const ORS_URL = 'https://api.openrouteservice.org/v2/directions';
+// HeiGIT stellt api.openrouteservice.org ein (Dashboard-Hinweis + Forum „Deprecating api.openrouteservice.org in
+// favour of api.heigit.org“, 2026); neues Schema api.heigit.org/<dienst>/<version>/.
+export const ORS_DEFAULT_BASE_URL = 'https://api.heigit.org/openrouteservice';
 const ORS_TIMEOUT_MS = 15_000;
 
 export function parseBody(raw: unknown): RouteRequestBody | null {
@@ -151,7 +155,7 @@ export async function handleRoute(req: Request, env: ProxyEnv, deps: ProxyDeps):
   const timer = setTimeout(() => ac.abort(), ORS_TIMEOUT_MS);
   let res: Response;
   try {
-    res = await deps.fetch(`${ORS_URL}/${ORS_PROFILE[body.mode]}/geojson`, {
+    res = await deps.fetch(`${(env.orsBaseUrl || ORS_DEFAULT_BASE_URL).replace(/\/+$/, '')}/v2/directions/${ORS_PROFILE[body.mode]}/geojson`, {
       method: 'POST',
       headers: { Authorization: env.orsApiKey, 'Content-Type': 'application/json', Accept: 'application/geo+json' },
       body: JSON.stringify(orsBody),

@@ -33,7 +33,7 @@ describe('Routing-Proxy (Supabase Edge Function, Handler)', () => {
     expect(r.status).toBe(200);
     expect(r.headers.get('access-control-allow-origin')).toBe(APP);
     const [url, init] = d.calls.mock.calls[0]!;
-    expect(url).toBe('https://api.openrouteservice.org/v2/directions/cycling-regular/geojson');
+    expect(url).toBe('https://api.heigit.org/openrouteservice/v2/directions/cycling-regular/geojson');
     expect((init!.headers as Record<string, string>).Authorization).toBe('secret-key');
     expect(JSON.parse(init!.body as string)).toEqual({ coordinates: BODY.coordinates, instructions: false, alternative_routes: { target_count: 2, weight_factor: 1.6 } });
     const out = await r.json();
@@ -85,6 +85,11 @@ describe('Routing-Proxy (Supabase Edge Function, Handler)', () => {
     expect(d.quota).toHaveBeenCalledWith(expect.stringMatching(/^[0-9a-f]{32}$/), 50, 1800);
     const broken = { fetch: d.fetch, takeQuota: async () => { throw new Error('db down'); } };
     expect((await handleRoute(post(BODY), ENV, broken)).status).toBe(503);
+  });
+  it('ORS base URL is configurable (trailing slash tolerated)', async () => {
+    const d = deps();
+    await handleRoute(post(BODY), { ...ENV, orsBaseUrl: 'https://ors.example/openrouteservice/' }, d);
+    expect(d.calls.mock.calls[0]![0]).toBe('https://ors.example/openrouteservice/v2/directions/cycling-regular/geojson');
   });
   it('does not request alternatives when via points are present (ORS limitation)', async () => {
     const d = deps();
