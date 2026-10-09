@@ -86,6 +86,10 @@ GPS-Aufzeichnung · Kartenlink-Import · Service-Worker-Update-Ablauf · Re-Rout
 | 5 Qualitäts-Gate | Release-Matrix, Geräte-/Security-/A11y-Tests | Nicht begonnen |
 | 6 Cloud/Admin | Auth, Sync, RLS, Admin, Kostenkontrolle | Nicht begonnen |
 
+### Straßenrouten im Alltagsablauf (2026-10-09)
+- Implementiert + getestet (Unit/Contract/E2E im Sandbox-Chromium): Fehlerursache des Proxys wird bis in den Segment-Hinweis durchgereicht (`proxy_*`-Texte DE/EN); Hinweis-Karte „Straßenroute berechnen“ bzw. „erneut versuchen“; Einschalten des Online-Schalters berechnet vorhandene Näherungsstrecken (Auto/Motorrad/Rad/Fuß) in einem Schritt (ein Undo); Proxy meldet ORS-Fehler 2004 als `too_long` (Function muss dafür neu deployt werden – optional).
+- **Nicht verifiziert:** Ablauf mit dem echten Supabase-Proxy im Browser des Nutzers (Grund der geraden Linie dort war nicht bestimmbar).
+
 ### Nächste konkrete Schritte
 1. OpenFreeMap gegen den echten Dienst und im MP4-Export prüfen (außerhalb der Sandbox); Routing-Free-Tier (R-03): Bedingungen belegen, dann umsetzen.
 2. E2E: Hintergrund-Abbruch, Service-Worker-Update.

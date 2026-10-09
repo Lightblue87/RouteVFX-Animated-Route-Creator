@@ -89,14 +89,14 @@ export async function computeSegment(from: Stop, to: Stop, mode: TransportMode, 
  * Berechnet einen Abschnitt mit neuem Verkehrsmittel. Gibt nur das neue Segment zurück; eingespielt wird es
  * über replaceSegmentIfUnchanged, damit eine langsame Routing-Antwort keine zwischenzeitlichen Änderungen überschreibt.
  */
-export async function changeSegmentMode(p: Project, segId: string, mode: TransportMode, settings: RoutingSettings): Promise<{ base: RouteSegment; segment: RouteSegment; notices: string[]; usedOnline: boolean } | null> {
+export async function changeSegmentMode(p: Project, segId: string, mode: TransportMode, settings: RoutingSettings, signal?: AbortSignal): Promise<{ base: RouteSegment; segment: RouteSegment; notices: string[]; usedOnline: boolean } | null> {
   const old = p.journey.segments.find((s) => s.id === segId);
   if (!old) return null;
   const from = p.journey.stops.find((s) => s.id === old.fromStopId)!;
   const to = p.journey.stops.find((s) => s.id === old.toStopId)!;
   const notices: string[] = [];
   const usage = { online: false };
-  const seg = await computeSegment(from, to, mode, settings, undefined, notices, usage);
+  const seg = await computeSegment(from, to, mode, settings, signal, notices, usage);
   seg.lineStyle = { ...defaultLineStyle(mode), widthPx: old.lineStyle.widthPx };
   seg.manualDurationMs = old.manualDurationMs;
   return { base: old, segment: seg, notices, usedOnline: usage.online };

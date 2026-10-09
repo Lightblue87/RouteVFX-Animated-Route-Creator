@@ -7,11 +7,13 @@ import { createOnlineRoutingProvider } from '../adapters/routing/config';
 import type { RoutingSettings } from '../adapters/routing/registry';
 import { addStop, applyControlPoints, appendGpxTrack, controlPointsOf, changeSegmentMode, LatestRequestGate, markOnlineUsed, fillMissingSegments, missingPairs, moveStop, normalizeSegments, replaceSegmentIfUnchanged, removeStop, updateSegment, updateStop } from '../features/projects/journey';
 import { GPX_MAX_BYTES, GpxError, parseGpx } from '../features/imports/gpx';
-import { TRANSPORT_MODES, type GeoPoint, type TransportMode } from '../core/types';
+import type { RouteSegment } from '../core/project/schema';
+import { RoutingError, TRANSPORT_MODES, type GeoPoint, type TransportMode } from '../core/types';
 import { formatKm, type MessageKey } from '../i18n';
 
 const ONLINE_KEY = 'arc.onlineAllowed';
 const onlineRouting = createOnlineRoutingProvider();
+const ROUTER_NAME = onlineRouting.id === 'ors-proxy' ? 'openrouteservice (HeiGIT) · Supabase' : 'FOSSGIS-OSRM';
 
 export function useOnlineSetting(): [boolean, (v: boolean) => void] {
   const [v, setV] = useState(() => {
@@ -31,7 +33,19 @@ export function RoutePanel({ api }: { api: ProjectApi }) {
   const [notices, setNotices] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [online, setOnline] = useOnlineSetting();
+  const [online, setOnlineState] = useOnlineSetting();
+  // Aktuelle Einwilligung, auch für laufende Sammelberechnungen: ein Widerruf stoppt weitere Übertragungen sofort.
+  const consent = useRef(online);
+  const batchAbort = useRef<AbortController | null>(null);
+  // Eigener Zustand der Sammelberechnung (unabhängig vom allgemeinen `busy`, das andere Abläufe zurücksetzen).
+  const [batching, setBatching] = useState(false);
+  // Panel wird verlassen (Tabwechsel): laufende Sammelberechnung abbrechen, damit nach einem späteren Widerruf nichts mehr gesendet wird.
+  useEffect(() => () => batchAbort.current?.abort(), []);
+  const setOnline = (v: boolean) => {
+    consent.current = v;
+    if (!v) batchAbort.current?.abort(); // auch eine in der Drosselung wartende Anfrage wird nicht mehr gesendet
+    setOnlineState(v);
+  };
   const settings: RoutingSettings = useMemo(() => ({ onlineAllowed: online, online: onlineRouting }), [online]);
   const fileRef = useRef<HTMLInputElement>(null);
   const [editId, setEditId] = useState<string | null>(null);
@@ -59,6 +73,8 @@ export function RoutePanel({ api }: { api: ProjectApi }) {
 
   // Fehlende Segmente nach Stopp-Änderungen berechnen
   const pending = useRef(false);
+  // Nach einer Sammelberechnung erneut prüfen: Änderungen währenddessen (z. B. Stopp entfernt) wurden vom Effekt übersprungen.
+  const [recheck, setRecheck] = useState(0);
   useEffect(() => {
     const orphan = project.journey.segments.length > Math.max(0, project.journey.stops.length - 1);
     if (orphan && missingPairs(project).length === 0) {
@@ -85,7 +101,7 @@ export function RoutePanel({ api }: { api: ProjectApi }) {
         pending.current = false;
         setBusy(false);
       });
-  }, [project, settings, commit]);
+  }, [project, settings, commit, recheck]);
 
   const add = (point: GeoPoint, label: string) => {
     commit((p) => addStop(p, point, label));
@@ -144,6 +160,48 @@ export function RoutePanel({ api }: { api: ProjectApi }) {
     } finally {
       modeGate.end(segId, token);
       setBusy(false);
+    }
+  };
+
+  // Straßen-/Wegmodi, die nur als gerade Näherung vorliegen: Online-Routing nachholen (ausdrückliche Nutzeraktion).
+  const ROAD_MODES: TransportMode[] = ['car', 'motorcycle', 'bike', 'walk'];
+  const estimatedRoad = project.journey.segments.filter((s) => s.confidence === 'estimated' && ROAD_MODES.includes(s.mode) && onlineRouting.supportedModes.includes(s.mode));
+  const recomputeRoads = async () => {
+    if (pending.current || estimatedRoad.length === 0) return;
+    pending.current = true;
+    setBusy(true);
+    setBatching(true);
+    try {
+      const allowed: RoutingSettings = { onlineAllowed: true, online: onlineRouting };
+      const done: { base: RouteSegment; segment: RouteSegment }[] = [];
+      const all: string[] = [];
+      // Vermerk vor der ersten Anfrage: Auch wenn der Widerruf eine bereits gesendete Anfrage abbricht, ist die
+      // Übertragung erfolgt. (Bei Abbruch noch vor dem Senden ist der Vermerk vorsorglich zu viel, nie zu wenig.)
+      commitDerived(markOnlineUsed);
+      const ctl = new AbortController();
+      batchAbort.current = ctl;
+      for (const seg of estimatedRoad) {
+        if (!consent.current) break;
+        let r;
+        try {
+          r = await changeSegmentMode(project, seg.id, seg.mode, allowed, ctl.signal);
+        } catch (e) {
+          if (e instanceof RoutingError && e.code === 'aborted') break; // Einwilligung widerrufen
+          throw e;
+        }
+        if (!r) continue;
+        all.push(...r.notices);
+        // Gleiches Verkehrsmittel: Farbe/Linienart/Breite des Nutzers bleiben vollständig erhalten.
+        done.push({ base: r.base, segment: { ...r.segment, lineStyle: r.base.lineStyle } });
+      }
+      if (done.length) commit((cur) => done.reduce((acc, d) => replaceSegmentIfUnchanged(acc, d.base, d.segment), cur));
+      setNotices(all);
+    } finally {
+      pending.current = false;
+      batchAbort.current = null;
+      setBatching(false);
+      setBusy(false);
+      setRecheck((n) => n + 1);
     }
   };
 
@@ -221,7 +279,7 @@ export function RoutePanel({ api }: { api: ProjectApi }) {
                 )}
                 {seg && (
                   <div className={`segment conf-${seg.confidence}`} data-testid="segment">
-                    <select value={seg.mode} onChange={(e) => setMode(seg.id, e.target.value as TransportMode)} aria-label={t('route.segment', { n: i + 1 })} data-testid="segment-mode">
+                    <select value={seg.mode} onChange={(e) => setMode(seg.id, e.target.value as TransportMode)} disabled={busy || batching} aria-label={t('route.segment', { n: i + 1 })} data-testid="segment-mode">
                       {TRANSPORT_MODES.map((m) => <option key={m} value={m}>{t(`mode.${m}`)}</option>)}
                     </select>
                     <span className="small">{formatKm(locale, seg.distanceM)}</span>
@@ -247,9 +305,17 @@ export function RoutePanel({ api }: { api: ProjectApi }) {
             );
           })}
         </ol>
+        {estimatedRoad.length > 0 && (
+          <div className="card" role="status">
+            {!online && <p className="small">{t('route.roadsHint', { router: ROUTER_NAME })}</p>}
+            <button className="btn primary small" onClick={() => { setOnline(true); void recomputeRoads(); }} disabled={busy} data-testid="compute-roads">
+              {online ? t('route.retryRoads') : t('route.computeRoads')}
+            </button>
+          </div>
+        )}
         <label className="toggle small">
-          <input type="checkbox" checked={online} onChange={(e) => setOnline(e.target.checked)} data-testid="online-toggle" />
-          {t('route.onlineToggle', { router: onlineRouting.id === 'ors-proxy' ? 'openrouteservice (HeiGIT) · Supabase' : 'FOSSGIS-OSRM' })}
+          <input type="checkbox" checked={online} onChange={(e) => { setOnline(e.target.checked); if (e.target.checked) void recomputeRoads(); }} data-testid="online-toggle" />
+          {t('route.onlineToggle', { router: ROUTER_NAME })}
         </label>
       </div>
     </div>

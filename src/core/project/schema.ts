@@ -71,6 +71,8 @@ export const ProjectSchema = z.object({
   cameraPreset: z.enum(['overview', 'follow', 'follow-rotate']),
   mapStyleRef: z.string().min(1),
   vehicleColor: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+  /** Darstellung des Fahrzeugs: Symbol (Badge) oder 2D-Illustration von oben. Fehlt bei älteren Projekten → Symbol. */
+  vehicleStyle: z.enum(['symbol', 'figure']).default('symbol'),
   overlays: z.object({
     showTitle: z.boolean(),
     showDistance: z.boolean(),

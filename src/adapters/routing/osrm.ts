@@ -42,6 +42,8 @@ export function createOsrmProvider(baseUrl = 'https://routing.openstreetmap.de',
       // Client-seitige Drosselung: höchstens 1 Anfrage pro Sekunde.
       const wait = lastCall + 1000 - Date.now();
       if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+      // Nach der Wartezeit: Wurde die Anfrage inzwischen abgebrochen (z. B. Einwilligung widerrufen), nichts senden.
+      if (signal?.aborted) throw new RoutingError('aborted', 'aborted');
       lastCall = Date.now();
       const coords = [req.start, ...req.via, req.end].map((p) => `${p.lon.toFixed(6)},${p.lat.toFixed(6)}`).join(';');
       const url = `${baseUrl}/${prof.path}/route/v1/${prof.profile}/${coords}?overview=full&geometries=geojson&alternatives=${req.alternatives ? 'true' : 'false'}`;

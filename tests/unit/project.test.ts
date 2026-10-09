@@ -29,6 +29,12 @@ describe('project model', () => {
     p = removeStop(p, p.journey.stops[0]!.id);
     expect(p.journey.segments.every((s) => p.journey.stops.some((st) => st.id === s.fromStopId))).toBe(true);
   });
+  it('Projekte ohne vehicleStyle (älterer Stand) bleiben ladbar und nutzen das Symbol', () => {
+    const { vehicleStyle: _omit, ...old } = createProject('de');
+    expect(migrateAndValidate(old).vehicleStyle).toBe('symbol');
+    expect(createProject('de').vehicleStyle).toBe('figure');
+    expect(() => migrateAndValidate({ ...createProject('de'), vehicleStyle: 'x' })).toThrow();
+  });
   it('GPX track import creates recorded segment with measured time', () => {
     let p = createProject('de');
     p = addStop(p, HANNOVER, 'Hannover');

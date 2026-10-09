@@ -26,7 +26,7 @@ export async function routeSegment(req: RoutingRequest, settings: RoutingSetting
       return { results: await online.route({ ...req, alternatives: true }, signal), usedOnline: true };
     } catch (e) {
       if (e instanceof RoutingError && e.code === 'aborted') throw e;
-      return { results: await estimatedProvider.route(req), fallbackReason: e instanceof RoutingError ? e.code : 'network', usedOnline: true };
+      return { results: await estimatedProvider.route(req), fallbackReason: e instanceof RoutingError ? (e.detail ? `proxy_${e.detail}` : e.code) : 'network', usedOnline: true };
     }
   }
   return { results: await estimatedProvider.route(req), usedOnline: false };

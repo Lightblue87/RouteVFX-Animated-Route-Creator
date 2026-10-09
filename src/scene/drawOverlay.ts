@@ -9,6 +9,7 @@ export interface OverlayOptions {
   locale: Locale;
   overlays: { showTitle: boolean; showDistance: boolean; showProgress: boolean; showModeChange: boolean; showStopLabels: boolean; showEstimateNotice: boolean };
   vehicleColor: string;
+  vehicleStyle: 'symbol' | 'figure';
   attribution: string;
   dark: boolean;
   /** Ausgabe-Pixel je logischem Pixel (2 für 1080p, 4 für 4K). */
@@ -74,7 +75,8 @@ export function drawOverlay(ctx: CanvasRenderingContext2D, state: SceneState, pr
   if (state.vehicle) {
     const p = project(state.vehicle.position);
     const rot = ((state.vehicle.headingDeg - state.camera.bearing) * Math.PI) / 180;
-    drawVehicle(ctx, state.vehicle.mode, p.x, p.y, rot, o.vehicleColor);
+    if (o.vehicleStyle === 'figure') drawVehicleFigure(ctx, state.vehicle.mode, p.x, p.y, rot, o.vehicleColor);
+    else drawVehicle(ctx, state.vehicle.mode, p.x, p.y, rot, o.vehicleColor);
   }
 
   // Lesbarkeits-Scrims hinter Titel und Kilometerzähler (WCAG-Kontrast für weiße Schrift)
@@ -209,6 +211,125 @@ export function drawVehicle(ctx: CanvasRenderingContext2D, mode: TransportMode, 
     ctx.translate(-12, -12);
   }
   glyph(ctx, mode);
+  ctx.restore();
+}
+
+/**
+ * 2D-Illustration von oben (eigene Vektorformen, keine Drittanbieter-Assets). Die Front zeigt nach oben und wird
+ * mit `rot` in Fahrtrichtung gedreht; ein weicher Schatten hebt das Fahrzeug von Karte und Route ab.
+ * `color` ist die Karosseriefarbe (Projekteinstellung).
+ */
+export function drawVehicleFigure(ctx: CanvasRenderingContext2D, mode: TransportMode, x: number, y: number, rot: number, color: string) {
+  const body = (w: number, h: number, r: number) => {
+    ctx.beginPath();
+    ctx.roundRect(-w / 2, -h / 2, w, h, r);
+    ctx.fill();
+    ctx.stroke();
+  };
+  const glass = (gx: number, gy: number, w: number, h: number) => {
+    ctx.save();
+    ctx.fillStyle = 'rgba(30,40,60,0.8)';
+    ctx.beginPath();
+    ctx.roundRect(gx - w / 2, gy - h / 2, w, h, 2);
+    ctx.fill();
+    ctx.restore();
+  };
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(rot);
+  ctx.shadowColor = 'rgba(0,0,0,0.4)';
+  ctx.shadowBlur = 8;
+  ctx.shadowOffsetY = 3;
+  ctx.fillStyle = color;
+  ctx.strokeStyle = MODE_BADGE[mode];
+  ctx.lineWidth = 2.5;
+  switch (mode) {
+    case 'car':
+      body(22, 42, 8);
+      ctx.shadowColor = 'transparent';
+      glass(0, -9, 15, 9);
+      glass(0, 11, 15, 7);
+      break;
+    case 'bus':
+      body(22, 58, 5);
+      ctx.shadowColor = 'transparent';
+      glass(0, -22, 16, 7);
+      for (const gy of [-8, 4, 16]) glass(0, gy, 14, 8);
+      break;
+    case 'motorcycle':
+    case 'bike':
+      ctx.fillRect(-1.5, -22, 3, 44);
+      ctx.strokeRect(-1.5, -22, 3, 44);
+      ctx.shadowColor = 'transparent';
+      ctx.fillStyle = MODE_BADGE[mode];
+      ctx.fillRect(-9, -13, 18, 3);
+      ctx.beginPath();
+      ctx.ellipse(0, 2, mode === 'bike' ? 5 : 7, 8, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(0, -5, 4.5, 0, Math.PI * 2);
+      ctx.fillStyle = color;
+      ctx.fill();
+      break;
+    case 'train':
+      body(18, 62, 9);
+      ctx.shadowColor = 'transparent';
+      glass(0, -22, 12, 8);
+      ctx.fillStyle = MODE_BADGE[mode];
+      ctx.fillRect(-9, -1, 18, 2);
+      ctx.fillRect(-9, 15, 18, 2);
+      break;
+    case 'plane':
+      ctx.scale(0.75, 0.75);
+      ctx.beginPath();
+      ctx.moveTo(0, -30);
+      ctx.bezierCurveTo(4, -22, 4, -8, 3, -4);
+      ctx.lineTo(30, 8);
+      ctx.lineTo(30, 13);
+      ctx.lineTo(3, 6);
+      ctx.lineTo(3, 20);
+      ctx.lineTo(11, 27);
+      ctx.lineTo(11, 31);
+      ctx.lineTo(0, 28);
+      ctx.lineTo(-11, 31);
+      ctx.lineTo(-11, 27);
+      ctx.lineTo(-3, 20);
+      ctx.lineTo(-3, 6);
+      ctx.lineTo(-30, 13);
+      ctx.lineTo(-30, 8);
+      ctx.lineTo(-3, -4);
+      ctx.bezierCurveTo(-4, -8, -4, -22, 0, -30);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      break;
+    case 'ship':
+      ctx.beginPath();
+      ctx.moveTo(0, -34);
+      ctx.bezierCurveTo(14, -22, 14, 10, 11, 30);
+      ctx.lineTo(-11, 30);
+      ctx.bezierCurveTo(-14, 10, -14, -22, 0, -34);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.shadowColor = 'transparent';
+      ctx.fillStyle = MODE_BADGE[mode];
+      ctx.fillRect(-7, -6, 14, 20);
+      ctx.fillStyle = color;
+      ctx.fillRect(-4, -2, 8, 8);
+      break;
+    case 'walk':
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 14, 8, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.shadowColor = 'transparent';
+      ctx.beginPath();
+      ctx.arc(0, -1, 6, 0, Math.PI * 2);
+      ctx.fillStyle = MODE_BADGE[mode];
+      ctx.fill();
+      break;
+  }
   ctx.restore();
 }
 

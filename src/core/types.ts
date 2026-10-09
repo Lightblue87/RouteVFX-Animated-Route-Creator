@@ -44,6 +44,8 @@ export class RoutingError extends Error {
   constructor(
     public readonly code: 'network' | 'no_route' | 'unsupported_mode' | 'rate_limited' | 'invalid_response' | 'aborted' | 'disabled',
     message: string,
+    /** Optionale Ursache des Anbieters/Proxys (z. B. „origin_not_allowed“), für verständliche Hinweise. */
+    public readonly detail?: string,
   ) {
     super(message);
     this.name = 'RoutingError';

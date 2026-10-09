@@ -35,6 +35,7 @@ export function createProject(locale: 'de' | 'en', title = ''): Project {
     cameraPreset: 'follow',
     mapStyleRef: 'ne-light',
     vehicleColor: '#ffffff',
+    vehicleStyle: 'figure',
     overlays: {
       showTitle: true,
       showDistance: true,

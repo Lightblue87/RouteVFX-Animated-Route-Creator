@@ -3,6 +3,7 @@ import { clientKey, handleRoute, parseBody, type ProxyEnv } from '../../supabase
 import { createOrsProxyProvider, ORS_ATTRIBUTION } from '../../src/adapters/routing/orsProxy';
 import { createOnlineRoutingProvider } from '../../src/adapters/routing/config';
 import { proxyOrigin } from '../../src/adapters/routing/proxyOrigin';
+import { routeSegment } from '../../src/adapters/routing/registry';
 import { RoutingError } from '../../src/core/types';
 
 const APP = 'https://app.example';
@@ -100,6 +101,7 @@ describe('Routing-Proxy (Supabase Edge Function, Handler)', () => {
     const cases: [() => Promise<Response>, number][] = [
       [async () => res({ error: { code: 2009, message: 'Route could not be found' } }, 404), 422],
       [async () => res({ error: { code: 2010 } }, 404), 422],
+      [async () => res({ error: { code: 2004, message: 'exceeds the server configuration maximum' } }, 400), 422],
       [async () => res({}, 429), 429],
       [async () => res({}, 403), 503],
       [async () => res({ error: { code: 2099 } }, 500), 502],
@@ -140,6 +142,33 @@ describe('ORS-Proxy-Adapter (Client)', () => {
     expect(await err(503)).toBe('disabled');
     expect(await err(500)).toBe('network');
     expect(await err(200, { routes: [] })).toBe('invalid_response');
+  });
+  it('keeps the proxy error cause as detail and the registry exposes it as fallbackReason', async () => {
+    const mk = (status: number, error: string) => createOrsProxyProvider('https://x', (async () => res({ error }, status)) as unknown as typeof fetch);
+    const detail = async (status: number, error: string) => {
+      try { await mk(status, error).route({ start: H, end: B, via: [], mode: 'car' }); return 'none'; } catch (e) { return (e as RoutingError).detail; }
+    };
+    expect(await detail(403, 'origin_not_allowed')).toBe('origin_not_allowed');
+    expect(await detail(422, 'too_long')).toBe('too_long');
+    expect(await detail(503, 'quota_unavailable')).toBe('quota_unavailable');
+    expect(await detail(500, 'Not JSON!')).toBeUndefined();
+    // Browser-blockierte Antwort (CORS) / offline: kein lesbarer Body, aber ein diagnostischer Hinweis
+    const blocked = createOrsProxyProvider('https://x', (async () => { throw new TypeError('Failed to fetch'); }) as unknown as typeof fetch);
+    await expect(blocked.route({ start: H, end: B, via: [], mode: 'car' })).rejects.toMatchObject({ code: 'network', detail: 'cors_or_offline' });
+    const out = await routeSegment({ start: H, end: B, via: [], mode: 'car' }, { onlineAllowed: true, online: mk(403, 'origin_not_allowed') });
+    expect(out.fallbackReason).toBe('proxy_origin_not_allowed');
+    expect(out.results[0]!.confidence).toBe('estimated');
+  });
+  it('sends nothing when the request is aborted while waiting in the client throttle', async () => {
+    const fetchMock = vi.fn(async () => res({ routes: [{ coordinates: [[9.7, 52.3], [10.5, 52.2]], distanceM: 1, durationS: 1 }], attribution: ORS_ATTRIBUTION }));
+    const p = createOrsProxyProvider('https://x', fetchMock as unknown as typeof fetch);
+    await p.route({ start: H, end: B, via: [], mode: 'car' });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const ctl = new AbortController();
+    const second = p.route({ start: H, end: B, via: [], mode: 'car' }, ctl.signal);
+    setTimeout(() => ctl.abort(), 100); // während der ~1-s-Drosselung
+    await expect(second).rejects.toMatchObject({ code: 'aborted' });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
   it('rejects unsupported modes without a request', async () => {
     const fetchMock = vi.fn();

@@ -37,6 +37,8 @@ export function createOrsProxyProvider(proxyUrl: string, fetchImpl: typeof fetch
       // Client-seitige Drosselung: höchstens 1 Anfrage pro Sekunde (schont das gemeinsame Tageskontingent).
       const wait = lastCall + 1000 - Date.now();
       if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+      // Nach der Wartezeit: Wurde die Anfrage inzwischen abgebrochen (z. B. Einwilligung widerrufen), nichts senden.
+      if (signal?.aborted) throw new RoutingError('aborted', 'aborted');
       lastCall = Date.now();
       let res: Response;
       try {
@@ -48,12 +50,19 @@ export function createOrsProxyProvider(proxyUrl: string, fetchImpl: typeof fetch
         });
       } catch (e) {
         if ((e as Error).name === 'AbortError') throw new RoutingError('aborted', 'aborted');
-        throw new RoutingError('network', (e as Error).message);
+        // Eine vom Browser blockierte Antwort (CORS, z. B. bei falscher ROUTING_ALLOWED_ORIGINS) ist von „offline“ nicht zu
+        // unterscheiden – der Hinweis nennt deshalb beide möglichen Ursachen.
+        throw new RoutingError('network', (e as Error).message, 'cors_or_offline');
       }
-      if (res.status === 429) throw new RoutingError('rate_limited', 'HTTP 429');
-      if (res.status === 422) throw new RoutingError('no_route', 'no route');
-      if (res.status === 503) throw new RoutingError('disabled', 'routing proxy disabled or upstream quota exhausted');
-      if (!res.ok) throw new RoutingError('network', `HTTP ${res.status}`);
+      if (!res.ok) {
+        // Der Proxy nennt die Ursache als { error: "<code>" } – nur bekannte Kürzel übernehmen.
+        const body = (await res.json().catch(() => null)) as { error?: unknown } | null;
+        const detail = typeof body?.error === 'string' && /^[a-z_]{1,32}$/.test(body.error) ? body.error : undefined;
+        if (res.status === 429) throw new RoutingError('rate_limited', 'HTTP 429', detail);
+        if (res.status === 422) throw new RoutingError('no_route', 'no route', detail);
+        if (res.status === 503) throw new RoutingError('disabled', 'routing proxy disabled or upstream quota exhausted', detail);
+        throw new RoutingError('network', `HTTP ${res.status}`, detail);
+      }
       const parsed = ProxyResponse.safeParse(await res.json().catch(() => null));
       if (!parsed.success) throw new RoutingError('invalid_response', parsed.error.message);
       const warnings = req.mode === 'motorcycle' ? ['motorcycle_uses_car_profile'] : [];

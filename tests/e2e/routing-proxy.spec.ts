@@ -40,11 +40,14 @@ test('Online-Routing über den Supabase-Proxy: Anbieterroute mit Attribution, Fa
   await expect(page.getByTestId('segment-confidence')).toHaveText(/Geschätzt|Estimated/);
   expect(requests).toEqual([]);
 
-  // Mit Zustimmung: neuer Abschnitt wird über den Proxy berechnet
+  // Mit Zustimmung: der bereits vorhandene Näherungsabschnitt wird nachträglich über den Proxy berechnet …
   await toggle.check();
+  await expect.poll(() => requests.length, { timeout: 15_000 }).toBe(1);
+  await expect(page.getByTestId('segment-confidence')).toHaveText(/Anbieterroute|Provider route/);
+  // … und ein neuer Abschnitt ebenfalls
   await addPlace(page, 'Bielefeld', /Bielefeld/);
   await expect(page.getByTestId('segment')).toHaveCount(2);
-  await expect.poll(() => requests.length, { timeout: 15_000 }).toBe(1);
+  await expect.poll(() => requests.length, { timeout: 15_000 }).toBe(2);
   expect(requests[0]!.body.mode).toBe('car');
   expect(requests[0]!.body.coordinates).toHaveLength(2);
   expect(requests[0]!.body.coordinates.flat().every((v) => typeof v === 'number')).toBe(true);
@@ -56,7 +59,189 @@ test('Online-Routing über den Supabase-Proxy: Anbieterroute mit Attribution, Fa
   mode = 'quota';
   await second.getByTestId('segment-mode').selectOption('walk');
   await expect(second.getByTestId('segment-confidence')).toHaveText(/Geschätzt|Estimated/);
-  expect(requests).toHaveLength(2);
-  expect(requests[1]!.body.mode).toBe('walk');
+  expect(requests).toHaveLength(3);
+  expect(requests[2]!.body.mode).toBe('walk');
   await expect(page.getByTestId('save-state')).toHaveText(/Gespeichert|Saved/);
+});
+
+test('Hinweis-Karte: Straßenroute per Knopf, konkrete Fehlerursache, erneuter Versuch', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('create-project').click();
+  const toggle = page.getByTestId('online-toggle');
+  test.skip(!/Supabase/.test((await toggle.locator('..').textContent()) ?? ''), 'Build ohne VITE_ROUTING_PROXY_URL');
+
+  let fail = true;
+  let calls = 0;
+  await page.context().route(PROXY, async (route) => {
+    const req = route.request();
+    const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'content-type' };
+    if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
+    calls++;
+    // Wie der Browser bei falscher Origin: Preflight ohne CORS-Header → Anfrage scheitert, kein lesbarer Body.
+    if (fail) return route.abort('failed');
+    const [a, b] = req.postDataJSON().coordinates as number[][];
+    return route.fulfill({ status: 200, headers: cors, json: { routes: [{ coordinates: [a, [(a![0]! + b![0]!) / 2, (a![1]! + b![1]!) / 2 + 0.05], b], distanceM: 68488.5, durationS: 3058.7 }], attribution: ATTRIBUTION } });
+  });
+
+  await addPlace(page, 'Hannover', /Hannover|Hanover/);
+  await addPlace(page, 'Braunschweig', /Braunschweig/);
+  await expect(page.getByTestId('segment-confidence')).toHaveText(/Geschätzt|Estimated/);
+  expect(calls).toBe(0);
+
+  // Hinweis mit Knopf; Klick erlaubt Online-Dienst und berechnet nach – hier mit möglicher Fehlerursache
+  await page.getByTestId('compute-roads').click();
+  await expect(toggle).toBeChecked();
+  await expect(page.getByTestId('segment')).toContainText(/ROUTING_ALLOWED_ORIGINS/);
+  await expect(page.getByTestId('segment-confidence')).toHaveText(/Geschätzt|Estimated/);
+
+  // Eigene Linienart bleibt beim späteren Berechnen erhalten
+  await page.getByTestId('tab-animate').click();
+  const kind = page.locator('select[aria-label]').filter({ has: page.locator('option[value="dashed"]') }).first();
+  await kind.selectOption('full');
+  await page.getByTestId('tab-route').click();
+
+  // Ursache behoben → erneuter Versuch liefert die Anbieterroute
+  fail = false;
+  await page.getByTestId('compute-roads').click();
+  await expect(page.getByTestId('segment-confidence')).toHaveText(/Anbieterroute|Provider route/);
+  await expect(page.getByTestId('compute-roads')).toHaveCount(0);
+  await page.getByTestId('tab-animate').click();
+  await expect(kind).toHaveValue('full');
+});
+
+test('Widerruf der Einwilligung stoppt eine laufende Sammelberechnung', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('create-project').click();
+  const toggle = page.getByTestId('online-toggle');
+  test.skip(!/Supabase/.test((await toggle.locator('..').textContent()) ?? ''), 'Build ohne VITE_ROUTING_PROXY_URL');
+
+  let calls = 0;
+  await page.context().route(PROXY, async (route) => {
+    const req = route.request();
+    const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'content-type' };
+    if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
+    calls++;
+    await new Promise((r) => setTimeout(r, 1500)); // erste Antwort verzögern, Widerruf während des Fluges
+    const [a, b] = req.postDataJSON().coordinates as number[][];
+    return route.fulfill({ status: 200, headers: cors, json: { routes: [{ coordinates: [a, b], distanceM: 1000, durationS: 60 }], attribution: ATTRIBUTION } });
+  });
+
+  await addPlace(page, 'Hannover', /Hannover|Hanover/);
+  await addPlace(page, 'Braunschweig', /Braunschweig/);
+  await addPlace(page, 'Bielefeld', /Bielefeld/);
+  await expect(page.getByTestId('segment')).toHaveCount(2);
+  expect(calls).toBe(0);
+
+  await toggle.check();
+  await expect.poll(() => calls).toBe(1);
+  await toggle.uncheck();
+  await page.waitForTimeout(3500); // genug Zeit für eine zweite Anfrage (Drosselung 1/s + Antwort)
+  expect(calls).toBe(1);
+  // Die erste Anfrage wurde gesendet (auch wenn der Widerruf sie abbricht): Das Projekt muss das vermerken.
+  await expect(page.getByTestId('save-state')).toHaveText(/Gespeichert|Saved/);
+  const usedOnline = await page.evaluate(
+    () =>
+      new Promise<boolean>((resolve, reject) => {
+        const open = indexedDB.open('arc-local');
+        open.onerror = () => reject(open.error);
+        open.onsuccess = () => {
+          const all = open.result.transaction('projects').objectStore('projects').getAll();
+          all.onsuccess = () => resolve((all.result as { privacy: { usedOnlineServices: boolean } }[])[0]!.privacy.usedOnlineServices);
+          all.onerror = () => reject(all.error);
+        };
+      }),
+  );
+  expect(usedOnline).toBe(true);
+});
+
+test('Widerruf während der Client-Drosselung sendet keine weitere Anfrage', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('create-project').click();
+  const toggle = page.getByTestId('online-toggle');
+  test.skip(!/Supabase/.test((await toggle.locator('..').textContent()) ?? ''), 'Build ohne VITE_ROUTING_PROXY_URL');
+
+  let calls = 0;
+  await page.context().route(PROXY, async (route) => {
+    const req = route.request();
+    const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'content-type' };
+    if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
+    calls++;
+    const [a, b] = req.postDataJSON().coordinates as number[][];
+    return route.fulfill({ status: 200, headers: cors, json: { routes: [{ coordinates: [a, b], distanceM: 1000, durationS: 60 }], attribution: ATTRIBUTION } });
+  });
+
+  await addPlace(page, 'Hannover', /Hannover|Hanover/);
+  await addPlace(page, 'Braunschweig', /Braunschweig/);
+  await addPlace(page, 'Bielefeld', /Bielefeld/);
+  await expect(page.getByTestId('segment')).toHaveCount(2);
+
+  await toggle.check();
+  await expect.poll(() => calls).toBe(1); // schnelle Antwort: die zweite Anfrage wartet jetzt in der Drosselung
+  await toggle.uncheck();
+  await page.waitForTimeout(2500);
+  expect(calls).toBe(1);
+});
+
+test('Stopp während der Sammelberechnung entfernt: fehlende Verbindung wird danach berechnet', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('create-project').click();
+  const toggle = page.getByTestId('online-toggle');
+  test.skip(!/Supabase/.test((await toggle.locator('..').textContent()) ?? ''), 'Build ohne VITE_ROUTING_PROXY_URL');
+
+  await page.context().route(PROXY, async (route) => {
+    const req = route.request();
+    const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'content-type' };
+    if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
+    await new Promise((r) => setTimeout(r, 1500));
+    const [a, b] = req.postDataJSON().coordinates as number[][];
+    return route.fulfill({ status: 200, headers: cors, json: { routes: [{ coordinates: [a, b], distanceM: 1000, durationS: 60 }], attribution: ATTRIBUTION } });
+  });
+
+  await addPlace(page, 'Hannover', /Hannover|Hanover/);
+  await addPlace(page, 'Braunschweig', /Braunschweig/);
+  await addPlace(page, 'Bielefeld', /Bielefeld/);
+  await expect(page.getByTestId('segment')).toHaveCount(2);
+
+  await toggle.check(); // Sammelberechnung startet (Antwort 1,5 s verzögert)
+  await page.locator('.stop button.danger').nth(1).click(); // mittleren Stopp entfernen → beide Segmente weg, Verbindung fehlt
+  // Nach Abschluss der Sammelberechnung muss die neue Verbindung Hannover → Bielefeld berechnet werden
+  await expect(page.getByTestId('segment')).toHaveCount(1, { timeout: 15_000 });
+});
+
+test('Tabwechsel bricht die Sammelberechnung ab; Enter in der Suche entsperrt den Moduswechsel nicht', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('create-project').click();
+  const toggle = page.getByTestId('online-toggle');
+  test.skip(!/Supabase/.test((await toggle.locator('..').textContent()) ?? ''), 'Build ohne VITE_ROUTING_PROXY_URL');
+
+  let calls = 0;
+  await page.context().route(PROXY, async (route) => {
+    const req = route.request();
+    const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'content-type' };
+    if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
+    calls++;
+    await new Promise((r) => setTimeout(r, 1500));
+    const [a, b] = req.postDataJSON().coordinates as number[][];
+    return route.fulfill({ status: 200, headers: cors, json: { routes: [{ coordinates: [a, b], distanceM: 1000, durationS: 60 }], attribution: ATTRIBUTION } });
+  });
+  await page.context().route(/nominatim\.openstreetmap\.org/, (route) =>
+    route.fulfill({ status: 200, headers: { 'Access-Control-Allow-Origin': '*' }, json: [] }),
+  );
+
+  await addPlace(page, 'Hannover', /Hannover|Hanover/);
+  await addPlace(page, 'Braunschweig', /Braunschweig/);
+  await addPlace(page, 'Bielefeld', /Bielefeld/);
+  await expect(page.getByTestId('segment')).toHaveCount(2);
+
+  await toggle.check(); // Sammelberechnung läuft (erste Antwort 1,5 s verzögert)
+  await expect.poll(() => calls).toBe(1);
+  // Online-Suche per Enter setzt das allgemeine „busy“ zurück – der Moduswechsel muss trotzdem gesperrt bleiben
+  await page.getByTestId('place-search').fill('Ham');
+  await page.getByTestId('place-search').press('Enter');
+  await page.waitForTimeout(300);
+  await expect(page.getByTestId('segment-mode').first()).toBeDisabled();
+  // Tab verlassen → Berechnung wird abgebrochen, es folgt keine weitere Anfrage
+  await page.getByTestId('tab-animate').click();
+  await page.waitForTimeout(3000);
+  expect(calls).toBe(1);
 });
