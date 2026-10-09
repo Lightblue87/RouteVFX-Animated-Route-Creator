@@ -70,7 +70,9 @@ GPS-Aufzeichnung · Kartenlink-Import · Service-Worker-Update-Ablauf · Re-Rout
 
 ## Stand 2026-10-09 – Datenverlust-Fix (Autosave)
 - Fund: Der Autosave-E2E-Test scheiterte im Gesamtlauf unter Last in etwa jedem dritten Lauf. Ursache per Instrumentierung belegt: Beim Verlassen startete das Speichern korrekt, wurde aber nie bestätigt, weil ein Reload die offene IndexedDB-Transaktion abbrach. Echter Datenverlust (letzte Änderung weg), nicht nur ein Testproblem.
-- Fix: synchrones Schreib-Journal in `localStorage` + Wiederherstellung beim Seitenstart (ADR-006). Tests: 8 Integrationstests (`journal.test.ts`), E2E mit simuliertem Abbruch des Schreibvorgangs (deterministisch).
+- Fix: synchrones Schreib-Journal in `localStorage` + Wiederherstellung beim Seitenstart (ADR-006). Nachgebessert nach Codex-Review: Der Stand bleibt „ausstehend“, bis das Schreiben bestätigt ist (auch das verzögerte Speichern nach dem Debounce ist abgesichert; E2E fällt ohne Fix durch). Tests: 8 Integrationstests (`journal.test.ts`), E2E mit simuliertem Abbruch des Schreibvorgangs (deterministisch).
+
+- Proxy nachgebessert nach Codex-Review: gleitendes Minutenlimit gesamt (30 < ORS 40/min) über neue Migration `20261009090000_routing_minute_quota.sql`; abwärtskompatibel zur bereits deployten Function-Version. **Für das bestehende Supabase-Projekt:** zweite SQL-Datei ausführen und Function neu deployen (docs/SUPABASE_ROUTING.md).
 
 ## Phasenplan
 

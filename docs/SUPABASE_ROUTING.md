@@ -8,7 +8,7 @@ App (Browser) ──POST {mode, coordinates}──▶ Edge Function „route“ 
                                               └─ Tages-Kontingent je Client + gesamt (Tabelle routing_usage)
 ```
 
-Alles läuft im kostenlosen Rahmen: ORS-Standard-Plan mit 2.000 Routen/Tag und 40/Minute, Supabase Free Plan. Die Function begrenzt sich selbst auf **1.800 Routen/Tag gesamt** und **50 je Client und Tag**.
+Alles läuft im kostenlosen Rahmen: ORS-Standard-Plan mit 2.000 Routen/Tag und 40/Minute, Supabase Free Plan. Die Function begrenzt sich selbst auf **1.800 Routen/Tag gesamt**, **30 je gleitende Minute gesamt** und **50 je Client und Tag**.
 
 **Pausierung:** Supabase pausiert kostenlose Projekte nach 7 Tagen mit wenig Datenbankaktivität. Jede Routenanfrage schreibt einen Zähler und hält das Projekt aktiv. Nach einer Woche ohne Nutzung musst du das Projekt im Dashboard einmal fortsetzen („Restore project“). Bis dahin zeigt die App die gekennzeichnete Schätzung.
 
@@ -41,11 +41,15 @@ Alles läuft im kostenlosen Rahmen: ORS-Standard-Plan mit 2.000 Routen/Tag und 4
 
 ### Schritt 3 – Datenbank vorbereiten (SQL)
 
-1. Links **SQL Editor** → **New query**.
-2. Den kompletten Inhalt dieser Datei einfügen:
-   [`supabase/migrations/20261008220000_routing_quota.sql`](https://github.com/Lightblue87/RouteVFX-Animated-Route-Creator/blob/claude/nice-galileo-wiy8cr/supabase/migrations/20261008220000_routing_quota.sql) (auf GitHub oben rechts „Copy raw file“).
-3. **Run** klicken. Erwartet: „Success. No rows returned“.
-4. Kontrolle: Unter **Table Editor** gibt es jetzt die leere Tabelle `routing_usage`, unter **Database → Functions** die Funktion `routing_take_quota`.
+Es sind **zwei** SQL-Dateien, immer in dieser Reihenfolge (je eine eigene „New query“):
+
+1. Links **SQL Editor** → **New query** → Inhalt von
+   [`supabase/migrations/20261008220000_routing_quota.sql`](https://github.com/Lightblue87/RouteVFX-Animated-Route-Creator/blob/main/supabase/migrations/20261008220000_routing_quota.sql) einfügen („Copy raw file“ auf GitHub) → **Run**. Erwartet: „Success. No rows returned“. (Tages-Kontingente)
+2. Wieder **New query** → Inhalt von
+   [`supabase/migrations/20261009090000_routing_minute_quota.sql`](https://github.com/Lightblue87/RouteVFX-Animated-Route-Creator/blob/main/supabase/migrations/20261009090000_routing_minute_quota.sql) → **Run**. Erwartet: „Success“. (Minutenlimit: der openrouteservice-Standard-Plan erlaubt 40 Anfragen je 60 Sekunden; die Function lässt höchstens 30 zu.)
+3. Kontrolle: Unter **Table Editor** gibt es die leeren Tabellen `routing_usage` und `routing_recent`, unter **Database → Functions** die Funktion `routing_take_quota`.
+
+> **Bereits eingerichtet (Stand vor 2026-10-09)?** Dann nur die **zweite** Datei ausführen und die Function mit der aktuellen `docs/supabase/route-function-single-file.ts` neu deployen. Die alte Function-Version läuft bis dahin unverändert weiter (ohne Minutenlimit).
 
 ### Schritt 4 – Secrets setzen
 
@@ -58,7 +62,7 @@ Links **Edge Functions** → **Secrets** (alternativ: Project Settings → Edge 
 | `ROUTING_ALLOWED_ORIGINS` | `http://localhost:4173` (später kommagetrennt die echte App-Adresse ergänzen, z. B. `https://meine-app.example,http://localhost:4173` – ohne Schrägstrich am Ende) |
 | `ROUTING_ENABLED` | `true` |
 
-Optional (nur wenn du die Standardwerte ändern willst): `ROUTING_PER_CLIENT_DAILY` (Standard `50`), `ROUTING_GLOBAL_DAILY` (Standard `1800`), `ORS_BASE_URL` (Standard `https://api.heigit.org/openrouteservice`).
+Optional (nur wenn du die Standardwerte ändern willst): `ROUTING_PER_CLIENT_DAILY` (Standard `50`), `ROUTING_GLOBAL_DAILY` (Standard `1800`), `ROUTING_GLOBAL_PER_MINUTE` (Standard `30`, muss unter dem ORS-Limit 40 bleiben), `ORS_BASE_URL` (Standard `https://api.heigit.org/openrouteservice`).
 
 `SUPABASE_URL` und `SUPABASE_SERVICE_ROLE_KEY` stellt Supabase automatisch bereit. **Nicht** selbst anlegen.
 
@@ -67,7 +71,7 @@ Optional (nur wenn du die Standardwerte ändern willst): `ROUTING_PER_CLIENT_DAI
 1. Links **Edge Functions** → **Deploy a new function** → **Via Editor**.
 2. Funktionsname: **`route`** (genau so; er wird Teil der URL).
 3. Den vorgegebenen Beispielcode in `index.ts` komplett löschen und den Inhalt dieser Datei einfügen:
-   [`docs/supabase/route-function-single-file.ts`](https://github.com/Lightblue87/RouteVFX-Animated-Route-Creator/blob/claude/nice-galileo-wiy8cr/docs/supabase/route-function-single-file.ts) („Copy raw file“).
+   [`docs/supabase/route-function-single-file.ts`](https://github.com/Lightblue87/RouteVFX-Animated-Route-Creator/blob/main/docs/supabase/route-function-single-file.ts) („Copy raw file“).
 4. **Deploy function** klicken.
 5. Danach in der Function **route** → **Details** bzw. **Settings**: **„Enforce JWT verification“ / „Verify JWT“ ausschalten** und speichern. Die App hat in V1 keine Konten; die Function schützt sich selbst (erlaubte Herkunft, Kontingente, Notschalter).
 6. Die angezeigte Function-URL notieren: `https://<projekt-ref>.supabase.co/functions/v1/route`.
@@ -97,8 +101,8 @@ Invoke-RestMethod -Method Post -Uri "https://<projekt-ref>.supabase.co/functions
 | `Missing authorization header` / HTTP 401 | JWT-Prüfung noch an | Schritt 5.5 |
 | `origin_not_allowed` (403) | Origin passt nicht zu `ROUTING_ALLOWED_ORIGINS` | Secret prüfen (exakt `http://localhost:4173`, ohne `/` am Ende) |
 | `disabled` (503) | `ROUTING_ENABLED` ≠ `true` oder Schlüssel/Salz fehlt | Schritt 4 |
-| `quota_unavailable` (503) | SQL aus Schritt 3 fehlt oder ist fehlgeschlagen | Schritt 3 wiederholen |
-| `quota` (429) | Tageslimit erreicht | morgen wieder bzw. Limits erhöhen |
+| `quota_unavailable` (503) | SQL aus Schritt 3 fehlt oder ist fehlgeschlagen (beide Dateien, in Reihenfolge) | Schritt 3 wiederholen |
+| `quota` (429) | Tages- oder Minutenlimit erreicht | kurz warten bzw. morgen wieder; Limits per Secret anpassbar |
 | `upstream_quota` (503) / `upstream` (502) | ORS lehnt ab (Schlüssel falsch oder Kontingent leer) | Schlüssel in Schritt 4 prüfen, HeiGIT-Dashboard ansehen |
 | `upstream_unreachable` (502) | ORS nicht erreichbar | später erneut; ggf. `ORS_BASE_URL` prüfen |
 

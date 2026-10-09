@@ -49,9 +49,11 @@ export function Editor({ projectId, close }: { projectId: string; close: () => v
   const firstLoad = useRef(true);
   const pending = useRef<Project | null>(null);
   const persist = useCallback((p: Project) => {
-    if (pending.current === p) pending.current = null;
+    // Der Stand bleibt „ausstehend“, bis das Schreiben bestätigt ist: Wird die Seite währenddessen ausgeblendet oder
+    // geschlossen, oder schlägt das Schreiben fehl, sichert flush() ihn weiterhin im Journal.
     return saveProject(p)
       .then(() => {
+        if (pending.current === p) pending.current = null;
         journalClearIfSame(p);
         setSave('saved');
       })

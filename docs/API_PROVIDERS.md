@@ -21,7 +21,7 @@ Stand: 2026-10-08. Nachweise: `EXTERNAL_EVIDENCE.md`. Alle Anbieter sind hinter 
 ## Rate-Limits im Client
 | Anbieter | Limit im Code |
 |---|---|
-| ORS-Proxy | Client ≤ 1 Anfrage/s; Proxy: 50/Client/Tag, 1.800/Tag gesamt (unter ORS 2.000), ORS selbst 40/min |
+| ORS-Proxy | Client ≤ 1 Anfrage/s; Proxy: 50/Client/Tag, 1.800/Tag gesamt (unter ORS 2.000), 30 je gleitende Minute gesamt (unter ORS 40/min) |
 | OSRM | ≤ 1 Anfrage/s, nur bei Segmentänderung |
 | Nominatim | nur auf Absenden; keine Autovervollständigung |
 

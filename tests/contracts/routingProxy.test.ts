@@ -6,7 +6,7 @@ import { proxyOrigin } from '../../src/adapters/routing/proxyOrigin';
 import { RoutingError } from '../../src/core/types';
 
 const APP = 'https://app.example';
-const ENV: ProxyEnv = { orsApiKey: 'secret-key', allowedOrigins: `${APP}, http://localhost:4173`, enabled: 'true', perClientDaily: 50, globalDaily: 1800, quotaSalt: 'salt' };
+const ENV: ProxyEnv = { orsApiKey: 'secret-key', allowedOrigins: `${APP}, http://localhost:4173`, enabled: 'true', perClientDaily: 50, globalDaily: 1800, globalPerMinute: 30, quotaSalt: 'salt' };
 const BODY = { mode: 'bike', coordinates: [[9.7167, 52.367], [10.52, 52.27]], alternatives: true };
 const ORS_OK = {
   type: 'FeatureCollection',
@@ -82,7 +82,7 @@ describe('Routing-Proxy (Supabase Edge Function, Handler)', () => {
     const d = deps(undefined, false);
     expect((await handleRoute(post(BODY), ENV, d)).status).toBe(429);
     expect(d.calls).not.toHaveBeenCalled();
-    expect(d.quota).toHaveBeenCalledWith(expect.stringMatching(/^[0-9a-f]{32}$/), 50, 1800);
+    expect(d.quota).toHaveBeenCalledWith(expect.stringMatching(/^[0-9a-f]{32}$/), 50, 1800, 30);
     const broken = { fetch: d.fetch, takeQuota: async () => { throw new Error('db down'); } };
     expect((await handleRoute(post(BODY), ENV, broken)).status).toBe(503);
   });

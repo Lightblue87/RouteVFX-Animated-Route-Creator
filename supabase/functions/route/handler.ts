@@ -26,6 +26,8 @@ export interface ProxyEnv {
   enabled: string;
   perClientDaily: number;
   globalDaily: number;
+  /** Zugelassene Anfragen je gleitende 60 Sekunden, gesamt – unter dem ORS-Minutenlimit (40). */
+  globalPerMinute: number;
   /** Geheimes Salz für den IP-Hash. */
   quotaSalt: string;
   /** Basis-URL der ORS-API; Standard: neue HeiGIT-Adresse (api.openrouteservice.org wird abgeschaltet). */
@@ -35,7 +37,7 @@ export interface ProxyEnv {
 export interface ProxyDeps {
   fetch: typeof fetch;
   /** Zieht ein Kontingent; true = erlaubt. */
-  takeQuota: (clientKey: string, perClient: number, global: number) => Promise<boolean>;
+  takeQuota: (clientKey: string, perClient: number, global: number, perMinute: number) => Promise<boolean>;
   now?: () => Date;
 }
 
@@ -140,7 +142,7 @@ export async function handleRoute(req: Request, env: ProxyEnv, deps: ProxyDeps):
   const key = await clientKey(clientIp(req), env.quotaSalt, deps.now?.() ?? new Date());
   let allowed: boolean;
   try {
-    allowed = await deps.takeQuota(key, positiveInt(env.perClientDaily, 50), positiveInt(env.globalDaily, 1800));
+    allowed = await deps.takeQuota(key, positiveInt(env.perClientDaily, 50), positiveInt(env.globalDaily, 1800), positiveInt(env.globalPerMinute, 30));
   } catch {
     // Ohne funktionierende Kontingentprüfung keine Weiterleitung (fail closed).
     return json(503, { error: 'quota_unavailable' }, origin);
