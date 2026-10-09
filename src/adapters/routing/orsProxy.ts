@@ -39,7 +39,8 @@ export function createOrsProxyProvider(proxyUrl: string, fetchImpl: typeof fetch
       try {
         return await send(req, points, !!req.alternatives, signal);
       } catch (e) {
-        if (req.alternatives && e instanceof RoutingError && (e.detail === 'upstream' || e.detail === 'too_long')) return send(req, points, false, signal);
+        // Nur im Zwei-Punkte-Fall: Mit Wegpunkten sendet der Proxy keine Alternativen, ein Wiederholen änderte nichts.
+        if (req.alternatives && req.via.length === 0 && e instanceof RoutingError && (e.detail === 'upstream' || e.detail === 'too_long')) return send(req, points, false, signal);
         throw e;
       }
     },

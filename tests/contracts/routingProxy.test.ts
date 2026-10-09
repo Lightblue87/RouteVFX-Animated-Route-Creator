@@ -190,6 +190,10 @@ describe('ORS-Proxy-Adapter (Client)', () => {
     const f2 = vi.fn(async () => res({ error: 'upstream' }, 502));
     await expect(createOrsProxyProvider('https://x', f2 as unknown as typeof fetch).route({ start: H, end: B, via: [], mode: 'car' })).rejects.toMatchObject({ detail: 'upstream' });
     expect(f2).toHaveBeenCalledTimes(1);
+    // Mit Wegpunkten werden keine Alternativen gesendet → kein Wiederholen (spart Kontingent)
+    const fv = vi.fn(async () => res({ error: 'upstream' }, 502));
+    await expect(createOrsProxyProvider('https://x', fv as unknown as typeof fetch).route({ start: H, end: B, via: [{ lat: 52, lon: 10 }], mode: 'car', alternatives: true })).rejects.toMatchObject({ detail: 'upstream' });
+    expect(fv).toHaveBeenCalledTimes(1);
     const f3 = vi.fn(async () => res({ error: 'quota' }, 429));
     await expect(createOrsProxyProvider('https://x', f3 as unknown as typeof fetch).route({ start: H, end: B, via: [], mode: 'car', alternatives: true })).rejects.toMatchObject({ code: 'rate_limited' });
     expect(f3).toHaveBeenCalledTimes(1);
