@@ -1,7 +1,7 @@
 import type { Project, RouteSegment, LineStyle } from '../project/schema';
 import type { GeoPoint, RouteConfidence, TransportMode } from '../types';
 import {
-  alongLine, boundsOf, fitCamera, indexLine, initialBearingDeg, latFromMercatorY, lonFromMercatorX, mercatorX, mercatorY, sliceLine, unwrapLongitudes, type LineIndex,
+  alongLine, boundsOf, fitCamera, indexLine, latFromMercatorY, lonFromMercatorX, mercatorX, mercatorY, sliceLine, unwrapLongitudes, type LineIndex,
 } from '../geodesy';
 import { ease, phaseAt, planTimeline, type TimelinePlan } from '../timeline';
 
@@ -121,7 +121,14 @@ function smoothedHeadingDeg(index: LineIndex, distanceM: number, zoom: number, l
   const a = alongLine(index, Math.max(0, distanceM - half));
   const b = alongLine(index, Math.min(index.totalM, distanceM + half));
   if (a.point.lat === b.point.lat && a.point.lon === b.point.lon) return alongLine(index, distanceM).headingDeg;
-  return initialBearingDeg(a.point, b.point);
+  return mapBearingDeg(a.point, b.point);
+}
+
+/** Richtung der Sehne so, wie sie auf der (Mercator-)Karte erscheint: 0° = Norden oben, im Uhrzeigersinn. */
+export function mapBearingDeg(a: GeoPoint, b: GeoPoint): number {
+  const dx = mercatorX(b.lon) - mercatorX(a.lon);
+  const dySouth = mercatorY(b.lat) - mercatorY(a.lat); // Mercator-Y wächst nach Süden
+  return ((Math.atan2(dx, -dySouth) * 180) / Math.PI + 360) % 360;
 }
 
 function followTarget(model: SceneModel, tMs: number): CameraState {

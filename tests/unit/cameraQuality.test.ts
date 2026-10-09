@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { buildSceneModel, evaluateScene, type CameraState } from '../../src/core/scene/evaluate';
 import { createProject, createStop, segmentFromResult } from '../../src/core/project/factory';
 import type { GeoPoint } from '../../src/core/types';
+import { mapBearingDeg } from '../../src/core/scene/evaluate';
 
 /** Lange, kurvige Straßenroute (~1.500 km, Girona → Garbsen ähnlich): Hauptrichtung Nord mit Schlenkern. */
 function longWindingProject(durationMs: number, preset: 'follow' | 'follow-rotate') {
@@ -78,5 +79,14 @@ describe('Kamera auf langen, kurvigen Strecken', () => {
     for (let i = 1; i < head.length; i++) maxZoomStep = Math.max(maxZoomStep, Math.abs(head[i]!.zoom - head[i - 1]!.zoom));
     console.info(`Start: max Zoomschritt ${maxZoomStep.toFixed(3)}`);
     expect(maxZoomStep).toBeLessThan(0.05);
+  });
+});
+
+describe('Kartenrichtung (Mercator)', () => {
+  it('Sehne auf konstanter Breite ist auf der Karte waagerecht, auch weit im Norden', () => {
+    expect(mapBearingDeg({ lat: 80, lon: -60 }, { lat: 80, lon: 60 })).toBeCloseTo(90, 6);
+    expect(mapBearingDeg({ lat: 80, lon: 60 }, { lat: 80, lon: -60 })).toBeCloseTo(270, 6);
+    expect(mapBearingDeg({ lat: 10, lon: 5 }, { lat: 50, lon: 5 })).toBeCloseTo(0, 6);
+    expect(mapBearingDeg({ lat: 50, lon: 5 }, { lat: 10, lon: 5 })).toBeCloseTo(180, 6);
   });
 });
