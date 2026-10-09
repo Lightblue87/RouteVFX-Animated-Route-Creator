@@ -137,6 +137,21 @@ test('Widerruf der Einwilligung stoppt eine laufende Sammelberechnung', async ({
   await toggle.uncheck();
   await page.waitForTimeout(3500); // genug Zeit für eine zweite Anfrage (Drosselung 1/s + Antwort)
   expect(calls).toBe(1);
+  // Die erste Anfrage wurde gesendet (auch wenn der Widerruf sie abbricht): Das Projekt muss das vermerken.
+  await expect(page.getByTestId('save-state')).toHaveText(/Gespeichert|Saved/);
+  const usedOnline = await page.evaluate(
+    () =>
+      new Promise<boolean>((resolve, reject) => {
+        const open = indexedDB.open('arc-local');
+        open.onerror = () => reject(open.error);
+        open.onsuccess = () => {
+          const all = open.result.transaction('projects').objectStore('projects').getAll();
+          all.onsuccess = () => resolve((all.result as { privacy: { usedOnlineServices: boolean } }[])[0]!.privacy.usedOnlineServices);
+          all.onerror = () => reject(all.error);
+        };
+      }),
+  );
+  expect(usedOnline).toBe(true);
 });
 
 test('Widerruf während der Client-Drosselung sendet keine weitere Anfrage', async ({ page }) => {

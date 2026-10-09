@@ -168,7 +168,9 @@ export function RoutePanel({ api }: { api: ProjectApi }) {
       const allowed: RoutingSettings = { onlineAllowed: true, online: onlineRouting };
       const done: { base: RouteSegment; segment: RouteSegment }[] = [];
       const all: string[] = [];
-      let used = false;
+      // Vermerk vor der ersten Anfrage: Auch wenn der Widerruf eine bereits gesendete Anfrage abbricht, ist die
+      // Übertragung erfolgt. (Bei Abbruch noch vor dem Senden ist der Vermerk vorsorglich zu viel, nie zu wenig.)
+      commitDerived(markOnlineUsed);
       const ctl = new AbortController();
       batchAbort.current = ctl;
       for (const seg of estimatedRoad) {
@@ -181,12 +183,10 @@ export function RoutePanel({ api }: { api: ProjectApi }) {
           throw e;
         }
         if (!r) continue;
-        used ||= r.usedOnline;
         all.push(...r.notices);
         // Gleiches Verkehrsmittel: Farbe/Linienart/Breite des Nutzers bleiben vollständig erhalten.
         done.push({ base: r.base, segment: { ...r.segment, lineStyle: r.base.lineStyle } });
       }
-      if (used) commitDerived(markOnlineUsed);
       if (done.length) commit((cur) => done.reduce((acc, d) => replaceSegmentIfUnchanged(acc, d.base, d.segment), cur));
       setNotices(all);
     } finally {
