@@ -64,8 +64,13 @@ GPS-Aufzeichnung · Kartenlink-Import · Service-Worker-Update-Ablauf · Re-Rout
 ## Stand 2026-10-08 – Arbeitsschritt 3 (Routing-Proxy, R-03)
 - Geliefert: Supabase Edge Function `route` (Proxy zu openrouteservice) mit Origin-Allowlist, Kill-Switch, Tages-Kontingenten in Postgres (Migration), Client-Adapter `orsProxy`, Auswahl per `VITE_ROUTING_PROXY_URL`, CSP-Erweiterung, Einrichtungsanleitung `docs/SUPABASE_ROUTING.md`.
 - Tests (Sandbox): Vitest 92/92 (u. a. 13 Proxy-/Adapter-Tests, 3 SQL-Tests in PGlite); `deno check` der Function (auch in CI); echter Deno-Lauf der Function mit simulierter Supabase-DB (403/204/429/502 wie erwartet).
-- **Nicht getestet:** echtes Supabase-Projekt und echter ORS-Aufruf (Sandbox blockiert die ORS-API), Geräte.
-- **Nächster Schritt für dich:** Supabase-Projekt anlegen und Function nach `docs/SUPABASE_ROUTING.md` deployen; danach teste ich live.
+- **Live-Test durch den Produktverantwortlichen (2026-10-09, Windows PowerShell, echtes Supabase-Projekt in Frankfurt + echter ORS):** Hannover → Braunschweig, Auto: `distanceM` 68.488,5, `durationS` 3.058,7, Attribution zurückgegeben, in `routing_usage` eine Zeile mit `count = 1`. Damit sind Function, Migration, Secrets, ORS-Aufruf über `api.heigit.org/openrouteservice` und Kontingent-Zählung **auf der echten Infrastruktur verifiziert**. Die Anzeige „Â©“ stammt aus der Windows-PowerShell-Dekodierung (Antwort ohne `charset`); die Function sendet jetzt `application/json; charset=utf-8` (Neu-Deploy optional, im Browser unkritisch).
+- App-Ablauf gegen simulierte Proxy-Antwort im Format dieses Live-Tests (E2E `routing-proxy.spec.ts`, Build mit der echten Function-URL, unter der echten CSP): ohne Zustimmung keine Anfrage und gekennzeichnete Schätzung; mit Zustimmung Anbieterroute + Attribution; Kontingent erschöpft (429) → gekennzeichnete Schätzung.
+- **Nicht getestet:** die App im Browser gegen die echte Function (Sandbox erreicht supabase.co nicht), Geräte. Für die echte App-Adresse muss `ROUTING_ALLOWED_ORIGINS` ergänzt werden.
+
+## Stand 2026-10-09 – Datenverlust-Fix (Autosave)
+- Fund: Der Autosave-E2E-Test scheiterte im Gesamtlauf unter Last in etwa jedem dritten Lauf. Ursache per Instrumentierung belegt: Beim Verlassen startete das Speichern korrekt, wurde aber nie bestätigt, weil ein Reload die offene IndexedDB-Transaktion abbrach. Echter Datenverlust (letzte Änderung weg), nicht nur ein Testproblem.
+- Fix: synchrones Schreib-Journal in `localStorage` + Wiederherstellung beim Seitenstart (ADR-006). Tests: 8 Integrationstests (`journal.test.ts`), E2E mit simuliertem Abbruch des Schreibvorgangs (deterministisch).
 
 ## Phasenplan
 

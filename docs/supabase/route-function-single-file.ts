@@ -101,7 +101,7 @@ function clientIp(req: Request): string {
 }
 
 function json(status: number, body: unknown, origin: string | null): Response {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' };
+  const headers: Record<string, string> = { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' };
   if (origin) {
     headers['Access-Control-Allow-Origin'] = origin;
     headers['Vary'] = 'Origin';

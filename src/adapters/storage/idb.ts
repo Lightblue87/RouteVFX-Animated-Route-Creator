@@ -2,6 +2,7 @@ import { openDB, type IDBPDatabase } from 'idb';
 import { migrateAndValidate, ProjectLoadError } from '../../core/project/migrations';
 import type { Project } from '../../core/project/schema';
 import { newId } from '../../core/project/factory';
+import { journalClearIfSame, journalEntries, journalRemove } from './journal';
 
 /**
  * Lokale Persistenz (IndexedDB). Projekte als validiertes JSON, Medien getrennt als Blobs.
@@ -49,6 +50,7 @@ function db(): Promise<IDBPDatabase> {
 export async function _resetDbHandle(): Promise<void> {
   const d = dbp;
   dbp = null;
+  recovery = null;
   (await d?.catch(() => null))?.close();
 }
 
@@ -75,12 +77,57 @@ export async function saveProject(p: Project): Promise<void> {
   }
 }
 
+let recovery: Promise<boolean> | null = null;
+
+/**
+ * Spielt Journal-Einträge ein, deren IndexedDB-Schreibvorgang nicht bestätigt wurde (Seite beim Speichern verlassen).
+ * Läuft einmal je Seitenstart, vor dem ersten Lesen: Ein Journal stammt immer aus einem früheren Seitenleben – im
+ * laufenden Seitenleben ist der noch offene Schreibvorgang selbst zuständig (kein doppeltes Schreiben nach „Zurück“).
+ * Angewendet wird nur, wenn das Projekt noch existiert und nicht neuer gespeichert wurde (z. B. in einem anderen
+ * Tab); gelöschte Projekte werden nie wiederbelebt. Bei Speicherfehlern (Kontingent) bleibt das Journal erhalten
+ * und der nächste Zugriff versucht es erneut.
+ */
+export async function recoverJournals(): Promise<void> {
+  recovery ??= (async () => {
+    let complete = true;
+    for (const { id, raw } of journalEntries()) {
+      try {
+        const journal = migrateAndValidate(JSON.parse(raw));
+        const stored = await (await db()).get('projects', id);
+        if (!stored) {
+          journalRemove(id);
+          continue;
+        }
+        let storedNewer = false;
+        try {
+          storedNewer = migrateAndValidate(stored).modifiedAt > journal.modifiedAt;
+        } catch {
+          /* gespeicherter Datensatz defekt → das Journal ist die bessere Kopie */
+        }
+        if (storedNewer) {
+          journalRemove(id);
+          continue;
+        }
+        await saveProject(journal);
+        journalClearIfSame(journal);
+      } catch (e) {
+        if (e instanceof StorageError) complete = false; // später erneut versuchen, Journal behalten
+        else journalRemove(id); // unlesbar/ungültig: verwerfen
+      }
+    }
+    return complete;
+  })();
+  if (!(await recovery)) recovery = null;
+}
+
 export async function loadProject(id: string): Promise<Project | null> {
+  await recoverJournals();
   const raw = await (await db()).get('projects', id);
   return raw ? migrateAndValidate(raw) : null;
 }
 
 export async function listProjects(): Promise<LoadReport> {
+  await recoverJournals();
   const all = await (await db()).getAll('projects');
   const report: LoadReport = { projects: [], broken: [] };
   for (const raw of all) {
@@ -95,6 +142,7 @@ export async function listProjects(): Promise<LoadReport> {
 }
 
 export async function deleteProject(id: string): Promise<void> {
+  journalRemove(id); // sonst könnte ein altes Journal das gelöschte Projekt wiederbeleben
   const d = await db();
   const tx = d.transaction(['projects', 'blobs'], 'readwrite');
   await tx.objectStore('projects').delete(id);

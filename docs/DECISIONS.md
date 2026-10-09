@@ -75,6 +75,8 @@ Offline-Suche über Natural Earth Populated Places (7.342 Orte inkl. deutscher N
 
 IndexedDB über `idb` 8.0.4 (ISC). Projekte als Zod-validiertes JSON (`schemaVersion`), Medien getrennt als Blobs. Validierung beim Lesen **und** vor dem Schreiben; defekte Datensätze werden gemeldet, nie gelöscht. `navigator.storage.persist()` wird beim ersten Projekt angefragt.
 
+**Schreib-Journal (2026-10-09):** Ein E2E-Lauf unter Last deckte einen echten Datenverlust auf: Nach „Zurück“ plus sofortigem Reload/Schließen wurde die noch offene IndexedDB-Transaktion abgebrochen, die letzte Änderung fehlte (per Instrumentierung belegt: `put start`, nie `put done`). Deshalb sichert der Editor den noch nicht bestätigten Stand beim Verlassen zusätzlich **synchron** in `localStorage` (`src/adapters/storage/journal.ts`, nur Projekt-JSON, keine Blobs, ≤ 2 MB). Der nächste Seitenstart spielt es vor dem ersten Lesen ein (`recoverJournals`, einmal je Seitenstart): nur wenn das Projekt noch existiert und nicht neuer gespeichert wurde; gelöschte Projekte werden nie wiederbelebt; bei Speicherfehlern bleibt das Journal erhalten. Nach bestätigtem Schreiben wird es entfernt (nur bei identischem Stand). Grenze: Stürzt der Browser ab, bevor `localStorage` auf Datenträger geschrieben wurde, bleibt ein Restrisiko; ohne `localStorage` (blockiert/voll) gilt weiter nur der IndexedDB-Pfad.
+
 ## ADR-007 Deterministische Szene
 
 `buildSceneModel(project)` + `evaluateScene(model, tMs)` sind reine Funktionen. Vorschau und Export verwenden denselben Evaluator und denselben Overlay-Zeichner (`src/scene/drawOverlay.ts`). Kamera-Glättung erfolgt über ein symmetrisches Zeitfenster (zustandslos), daher identische Ergebnisse bei beliebiger Seek-Reihenfolge (Unit-Test).

@@ -25,6 +25,7 @@ Nach erstmaliger Nutzung eines Online-Dienstes wird `privacy.usedOnlineServices 
 - Löschen eines Projekts entfernt Projekt-JSON und zugehörige Blobs in einer Transaktion.
 - Hinweis in der App: Browser/OS können lokale Daten löschen; ohne Cloud kein Backup.
 - `navigator.storage.persist()` wird angefragt (keine Garantie).
+- Beim Verlassen des Editors wird der noch nicht bestätigte Projektstand kurzzeitig zusätzlich in `localStorage` gesichert (Schreib-Journal) und nach bestätigtem Speichern bzw. beim nächsten Start entfernt. Bleibt lokal auf dem Gerät; wird mit dem Projekt gelöscht.
 
 ## Offene Punkte vor Release
 - Datenschutzerklärung/Impressum (Anbieterkennzeichnung) – abhängig vom Betreiber.
