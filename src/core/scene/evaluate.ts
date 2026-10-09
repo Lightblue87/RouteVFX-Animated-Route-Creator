@@ -78,8 +78,21 @@ function selectedGeometry(s: RouteSegment): GeoPoint[] {
   return alt && s.selectedAlternative > 0 ? alt.geometry : s.geometry;
 }
 
-export function buildSceneModel(project: Project): SceneModel {
-  const plan = planTimeline(project);
+interface RouteGeometry {
+  segments: SceneModel['segments'];
+  overview: CameraState;
+  segmentZoom: number[];
+  /** Foto-Projektionen auf die Route, je Punkt einmal berechnet (Fotos ändern sich oft, die Route selten). */
+  projections: Map<string, { distanceM: number; segIdx: number; alongM: number } | null>;
+}
+
+// Die Geometrie hängt nur von der Reise ab. Projekte sind unveränderlich, `journey` ist deshalb ein stabiler Schlüssel:
+// Beschriftungs- oder Dauer-Änderungen an Fotos berechnen weder Linienindizes noch Fotoprojektionen neu.
+const geometryCache = new WeakMap<Project['journey'], RouteGeometry>();
+
+function routeGeometry(project: Project): RouteGeometry {
+  const hit = geometryCache.get(project.journey);
+  if (hit) return hit;
   // Gesamte Reise fortlaufend entfalten (Datumsgrenze): Offset des vorigen Endpunkts übernehmen.
   let lastLon: number | null = null;
   const segments = project.journey.segments.map((seg) => {
@@ -102,8 +115,16 @@ export function buildSceneModel(project: Project): SceneModel {
     // Folgekamera etwas näher als Segmentübersicht, aber nie näher als Zoom 12.
     return Math.min(12, Math.max(overview.zoom, z + 0.6));
   });
+  const g: RouteGeometry = { segments, overview, segmentZoom, projections: new Map() };
+  geometryCache.set(project.journey, g);
+  return g;
+}
+
+export function buildSceneModel(project: Project): SceneModel {
+  const plan = planTimeline(project);
+  const { segments, overview, segmentZoom, projections } = routeGeometry(project);
   const distanceTotalM = project.journey.segments.reduce((a, s) => a + s.distanceM, 0);
-  const photoMoments = schedulePhotos(project, plan, segments);
+  const photoMoments = schedulePhotos(project, plan, segments, projections);
   return { project, plan, segments, overview, segmentZoom, distanceTotalM, photoMoments };
 }
 
@@ -122,17 +143,21 @@ function invSmooth(f: number): number {
  * Wann kommt das Fahrzeug an einem Foto vorbei? Der Fotopunkt wird auf die nächstgelegene Stelle der Route abgebildet;
  * der Zeitpunkt ergibt sich aus dem Fortschritt dort. Fotos werden nacheinander gezeigt (kein Überlappen).
  */
-function schedulePhotos(project: Project, plan: TimelinePlan, segments: { index: LineIndex }[]): PhotoMoment[] {
+function schedulePhotos(project: Project, plan: TimelinePlan, segments: { index: LineIndex }[], cache: RouteGeometry['projections']): PhotoMoment[] {
   const found: { photoId: string; at: number; hold: number; distanceToRouteM: number }[] = [];
   const moves = plan.phases.filter((p) => p.kind === 'move');
   for (const photo of project.photos) {
     if (!photo.position) continue;
-    let best: { distanceM: number; segIdx: number; alongM: number } | null = null;
-    segments.forEach((s, i) => {
-      const hit = nearestOnLine(s.index, photo.position!);
-      if (hit && (!best || hit.distanceM < best.distanceM - 1e-6)) best = { distanceM: hit.distanceM, segIdx: i, alongM: hit.alongM };
-    });
-    const b = best as { distanceM: number; segIdx: number; alongM: number } | null;
+    const key = `${photo.position.lat},${photo.position.lon}`;
+    let b = cache.get(key);
+    if (b === undefined) {
+      b = null;
+      segments.forEach((s, i) => {
+        const hit = nearestOnLine(s.index, photo.position!);
+        if (hit && (!b || hit.distanceM < b.distanceM - 1e-6)) b = { distanceM: hit.distanceM, segIdx: i, alongM: hit.alongM };
+      });
+      cache.set(key, b);
+    }
     const mv = b ? moves[b.segIdx] : undefined;
     if (!b || !mv) continue;
     const f = segments[b.segIdx]!.index.totalM > 0 ? b.alongM / segments[b.segIdx]!.index.totalM : 0;

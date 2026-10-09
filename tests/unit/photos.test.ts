@@ -114,4 +114,15 @@ describe('Fotos auf der Route', () => {
     expect(b!.startMs).toBeGreaterThanOrEqual(a!.endMs);
     expect(b!.endMs).toBeLessThanOrEqual(model.plan.totalMs - 100);
   });
+
+  it('Foto-Änderungen (Beschriftung, Dauer) berechnen Linienindizes nicht neu; Routenänderungen schon', async () => {
+    const { p } = await withPhotos((m) => [photo(at(m, 1, 0.5))]);
+    const a = buildSceneModel(p);
+    const edited = { ...p, photos: p.photos.map((x) => ({ ...x, caption: 'neu', holdMs: 3000 })) };
+    const b = buildSceneModel(edited);
+    expect(b.segments).toBe(a.segments);
+    expect(b.photoMoments[0]!.endMs - b.photoMoments[0]!.startMs).toBe(3000);
+    const moved = { ...p, journey: { ...p.journey, segments: [...p.journey.segments] } };
+    expect(buildSceneModel(moved).segments).not.toBe(a.segments);
+  });
 });
