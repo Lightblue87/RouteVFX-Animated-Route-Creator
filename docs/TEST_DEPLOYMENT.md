@@ -18,6 +18,16 @@ Adresse nach der Einrichtung: `https://lightblue87.github.io/RouteVFX-Animated-R
 
 *Actions* → **Test-Deployment (GitHub Pages)** → *Run workflow* (Branch `main`) – oder Claude bitten, den Lauf zu starten, sobald Schritt 1 erledigt ist. Der Lauf prüft Typen und Tests, baut die App und veröffentlicht sie; die Adresse steht am Ende im Lauf. Neue Stände werden nur auf Knopfdruck veröffentlicht, nie automatisch.
 
+## Vorab-Test eines Branches (ohne zusätzlichen PR)
+
+Der Workflow darf auch vom Branch `test` veröffentlichen. Der Tab-Titel trägt dann „[TEST]“, damit man den Stand erkennt. Die Adresse ist dieselbe wie oben (es gibt nur eine Pages-Seite): ein Test-Stand **ersetzt** den bisherigen Stand, bis wieder von `main` veröffentlicht wird.
+
+1. Branch auf `test` schieben (macht Claude auf Zuruf): `git push --force origin <feature-branch>:test`.
+2. *Actions* → **Test-Deployment (GitHub Pages)** → *Run workflow* → **Branch: test**.
+3. Nach dem Merge wieder von `main` veröffentlichen (Run workflow → Branch `main`), damit der freigegebene Stand online ist.
+
+Einmalig nötig: *Settings → Environments → github-pages → Deployment branches and tags* → `test` hinzufügen (sonst lehnt GitHub das Deployment vom Branch `test` ab).
+
 ## Auf dem Handy
 
 - Adresse im Browser öffnen (iPhone: Safari, Android: Chrome). Installieren: iPhone *Teilen → Zum Home-Bildschirm*, Android *Menü → App installieren*.
