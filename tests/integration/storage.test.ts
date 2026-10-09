@@ -64,11 +64,22 @@ describe('IndexedDB storage', () => {
     await blob('old1', p.id);
     await blob('old2', p.id);
     await blob('foreign', other.id);
-    expect(await pruneUnreferencedBlobs(p.id, ['keep'])).toBe(2);
+    expect(await pruneUnreferencedBlobs(p.id, ['keep'], 0)).toBe(2);
     expect(await getBlob('keep')).toBeDefined();
     expect(await getBlob('old1')).toBeUndefined();
     expect(await getBlob('old2')).toBeUndefined();
     expect(await getBlob('foreign')).toBeDefined();
+  });
+  it('Aufräumen schützt frisch importierte Medien (noch nicht gespeicherter Verweis, zweiter Tab), entfernt aber ältere', async () => {
+    const p = await multimodalProject();
+    const blob = (id: string) => putBlob({ id, projectId: p.id, name: 'f.jpg', type: 'image/jpeg', size: 3, blob: new Blob(['abc']) });
+    await blob('fresh');
+    expect((await getBlob('fresh'))!.createdAt).toBeTypeOf('number');
+    expect(await pruneUnreferencedBlobs(p.id, [])).toBe(0);
+    expect(await getBlob('fresh')).toBeDefined();
+    // später (nach der Schonfrist) ist es verwaist und wird entfernt
+    expect(await pruneUnreferencedBlobs(p.id, [], undefined, Date.now() + 11 * 60_000)).toBe(1);
+    expect(await getBlob('fresh')).toBeUndefined();
   });
 });
 

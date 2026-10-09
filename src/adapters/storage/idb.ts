@@ -18,6 +18,8 @@ export interface StoredBlob {
   type: string;
   size: number;
   blob: Blob;
+  /** Zeitpunkt des Schreibens (ms). Fehlt bei älteren Einträgen; dient dem Schutz frisch importierter Medien vor dem Aufräumen. */
+  createdAt?: number;
 }
 
 export interface ProjectSummary {
@@ -166,7 +168,7 @@ export async function duplicateProject(p: Project, title: string): Promise<Proje
     const b = (await blobs.get(audio.assetId)) as StoredBlob | undefined;
     if (b) {
       const assetId = newId();
-      await blobs.put({ ...b, id: assetId, projectId: id });
+      await blobs.put({ ...b, id: assetId, projectId: id, createdAt: Date.now() });
       audio = { ...audio, assetId };
     }
   }
@@ -179,7 +181,7 @@ export async function duplicateProject(p: Project, title: string): Promise<Proje
       continue;
     }
     const assetId = newId();
-    await blobs.put({ ...b, id: assetId, projectId: id });
+    await blobs.put({ ...b, id: assetId, projectId: id, createdAt: Date.now() });
     photos.push({ ...ph, assetId });
   }
   const copy = migrateAndValidate({ ...structuredClone(p), id, title: title.slice(0, 80), createdAt: now, modifiedAt: now, audio, photos });
@@ -196,12 +198,17 @@ export async function duplicateProject(p: Project, title: string): Promise<Proje
  * Löscht Blobs eines Projekts, die nicht in `keep` stehen (z. B. entfernte oder ersetzte Audiodateien).
  * Nur aufrufen, wenn keine Undo-Historie mehr auf ältere Blobs verweisen kann – etwa beim Öffnen eines Projekts.
  */
-export async function pruneUnreferencedBlobs(projectId: string, keep: readonly string[]): Promise<number> {
+export const PRUNE_GRACE_MS = 10 * 60_000;
+
+export async function pruneUnreferencedBlobs(projectId: string, keep: readonly string[], graceMs = PRUNE_GRACE_MS, now = Date.now()): Promise<number> {
   const d = await db();
   const tx = d.transaction('blobs', 'readwrite');
   let removed = 0;
   for (const key of await tx.store.index('projectId').getAllKeys(projectId)) {
     if (keep.includes(String(key))) continue;
+    // Frisch importierte Medien sind evtl. noch nicht im gespeicherten Projekt vermerkt (Autosave-Verzögerung, zweiter Tab).
+    const b = (await tx.store.get(key)) as StoredBlob | undefined;
+    if (b?.createdAt !== undefined && now - b.createdAt < graceMs) continue;
     await tx.store.delete(key);
     removed++;
   }
@@ -211,7 +218,7 @@ export async function pruneUnreferencedBlobs(projectId: string, keep: readonly s
 
 export async function putBlob(b: StoredBlob): Promise<void> {
   try {
-    await (await db()).put('blobs', b);
+    await (await db()).put('blobs', { ...b, createdAt: b.createdAt ?? Date.now() });
   } catch (e) {
     wrap(e);
   }
