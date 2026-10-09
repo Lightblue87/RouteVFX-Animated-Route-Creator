@@ -14,7 +14,7 @@ Stand: 2026-10-08. Grundsatz: **Nullkosten beim Start**. Keine kostenpflichtigen
 | Routing online (Opt-in) | openrouteservice über Supabase Edge Function (wenn eingerichtet), sonst FOSSGIS-OSRM-Demo | 0 €: ORS Standard 2.000/Tag; Supabase Free 500.000 Aufrufe/Monat; Proxy begrenzt auf 1.800/Tag gesamt, 50/Client | Kontingent erschöpft/Projekt pausiert/Kill-Switch → gekennzeichneter Fallback; kein Pay-as-you-go |
 | Video-Encoding | Auf dem Gerät des Nutzers (WebCodecs) | 0 € serverseitig | Gerätelast beim Nutzer |
 | Speicher | IndexedDB auf dem Gerät | 0 € | Browser-Quota des Nutzers |
-| Hosting | **noch keines** (nicht veröffentlicht) | – | – |
+| Hosting | GitHub Pages **nur als Test-Veröffentlichung** (öffentliches Repo, per Hand ausgelöst, noindex) | 0 € | Traffic-Limit 100 GB/Monat (weich) laut GitHub-Doku; bei Überschreitung ggf. Drosselung durch GitHub, kein Pay-as-you-go |
 | Backend/Auth | keines | – | – |
 
 ## Geplante Hosting-Annahme (vor Release zu verifizieren, E12)
