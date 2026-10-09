@@ -110,3 +110,9 @@ GPS-Aufzeichnung · Kartenlink-Import · Service-Worker-Update-Ablauf · Re-Rout
 3. Streaming-Export (OPFS) gegen RAM-Grenze (R-06).
 4. Timeline-Editor mit Kamera-/Text-Keyframes (Ent. 13/14, Szenario 6).
 5. Geräte-Probe-Seite für iPhone/Android-Messungen (E08/E09/E13).
+
+### Foto-Orte lenken die Straßenroute (2026-10-09)
+- Implementiert + getestet (Unit 10, E2E mit simuliertem Proxy): Fotos mit Ort (Geo-Tag oder gesetzter Punkt) werden zu Zwischenpunkten der Straßenroute (Auto, Motorrad, Rad, Fuß). Nahe beieinander liegende Fotos werden zu einem Ort zusammengefasst; der Radius wächst mit der Routenlänge (1,5 % der Gesamtlänge, 300 m–30 km). Stellvertreter ist ein echter Foto-Ort. Höchstens 3 Zwischenpunkte je Abschnitt (Anbieterlimit 5 Punkte); bei mehr Orten wächst der Radius.
+- Ein Foto lenkt die Route nur, wenn es im Korridor des Abschnitts liegt (15 % der Abschnittslänge, 1–40 km); sonst gehört es zu einer anderen Etappe. Flug-, Schiff-, Bahn-, bearbeitete und GPX-Abschnitte bleiben unverändert.
+- Neuberechnung nur auf ausdrücklichen Knopfdruck („Route über Foto-Orte berechnen“): Dabei gehen Foto-Orte als Koordinaten an den Online-Routingdienst (Einwilligung wird eingeholt, Vermerk im Projekt). Eine echte Anbieterroute wird nie durch eine Näherung ersetzt. Entfernte Fotos nehmen den Umweg beim nächsten Berechnen zurück.
+- **Nicht verifiziert:** Verhalten gegen den echten Routingdienst (Sandbox erreicht ihn nicht; Antwort simuliert), Korridor-/Radius-Werte sind Heuristiken ohne Praxismessung, Unterschied „Foto-Ort ≠ befahrbare Straße“ (der Dienst setzt den Punkt auf die nächste Straße).

@@ -9,6 +9,7 @@ import { addStop, applyControlPoints, appendGpxTrack, controlPointsOf, changeSeg
 import { GPX_MAX_BYTES, GpxError, parseGpx } from '../features/imports/gpx';
 import type { RouteSegment } from '../core/project/schema';
 import { PhotoPanel } from './PhotoPanel';
+import { planPhotoVias, sameVia, segmentsNeedingVia } from '../features/photos/viaPoints';
 import { RoutingError, TRANSPORT_MODES, type GeoPoint, type TransportMode } from '../core/types';
 import { formatKm, type MessageKey } from '../i18n';
 
@@ -169,8 +170,18 @@ export function RoutePanel({ api }: { api: ProjectApi }) {
   // Straßen-/Wegmodi, die nur als gerade Näherung vorliegen: Online-Routing nachholen (ausdrückliche Nutzeraktion).
   const ROAD_MODES: TransportMode[] = ['car', 'motorcycle', 'bike', 'walk'];
   const estimatedRoad = project.journey.segments.filter((s) => s.confidence === 'estimated' && ROAD_MODES.includes(s.mode) && onlineRouting.supportedModes.includes(s.mode));
-  const recomputeRoads = async () => {
-    if (pending.current || estimatedRoad.length === 0) return;
+  // Foto-Orte als Zwischenpunkte: Abschnitte, deren Zwischenpunkte nicht zu den Fotos passen.
+  // Nur neu berechnen, wenn sich Route oder Foto-Orte ändern (nicht bei Beschriftung/Dauer): lange GPX-Routen sind teuer.
+  const photoKey = project.photos.map((x) => (x.position ? `${x.position.lat},${x.position.lon}` : '-')).join('|');
+  const viaPlan = useMemo(() => planPhotoVias(project), [project.journey, photoKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const photoVias = useMemo(() => segmentsNeedingVia(project, viaPlan).filter((x) => onlineRouting.supportedModes.includes(x.segment.mode)), [project.journey, viaPlan]); // eslint-disable-line react-hooks/exhaustive-deps
+  const viaMerged = viaPlan.merged;
+  // Aktueller Stand für Prüfungen während einer laufenden Berechnung (Fotos können währenddessen geändert werden).
+  const latest = useRef(project);
+  latest.current = project;
+  const stillWanted = (seg: RouteSegment, via: GeoPoint[]) => sameVia(planPhotoVias(latest.current).bySegment.get(seg.id) ?? [], via);
+  const runBatch = async (jobs: { seg: RouteSegment; via: GeoPoint[]; photo?: boolean }[]) => {
+    if (pending.current || jobs.length === 0) return;
     pending.current = true;
     setBusy(true);
     setBatching(true);
@@ -183,19 +194,25 @@ export function RoutePanel({ api }: { api: ProjectApi }) {
       commitDerived(markOnlineUsed);
       const ctl = new AbortController();
       batchAbort.current = ctl;
-      for (const seg of estimatedRoad) {
+      for (const { seg, via, photo } of jobs) {
         if (!consent.current) break;
+        // Foto-Orte seit der Planung geändert oder entfernt: nicht mit veralteten Orten senden (die Karte erscheint erneut).
+        if (photo && !stillWanted(seg, via)) continue;
         let r;
         try {
-          r = await changeSegmentMode(project, seg.id, seg.mode, allowed, ctl.signal);
+          r = await changeSegmentMode(project, seg.id, seg.mode, allowed, ctl.signal, via);
         } catch (e) {
           if (e instanceof RoutingError && e.code === 'aborted') break; // Einwilligung widerrufen
           throw e;
         }
         if (!r) continue;
         all.push(...r.notices);
+        // Eine bestehende echte Route wird nie durch eine Näherung ersetzt (z. B. bei Netzfehler).
+        if (r.base.confidence === 'provider_verified' && r.segment.confidence !== 'provider_verified') continue;
         // Gleiches Verkehrsmittel: Farbe/Linienart/Breite des Nutzers bleiben vollständig erhalten.
-        done.push({ base: r.base, segment: { ...r.segment, lineStyle: r.base.lineStyle } });
+        // Auch während der Anfrage kann sich ein Foto geändert haben: dann wird das Ergebnis nicht übernommen.
+        if (photo && !stillWanted(seg, via)) continue;
+        done.push({ base: r.base, segment: { ...r.segment, lineStyle: r.base.lineStyle, manualDurationMs: r.base.manualDurationMs } });
       }
       if (done.length) commit((cur) => done.reduce((acc, d) => replaceSegmentIfUnchanged(acc, d.base, d.segment), cur));
       setNotices(all);
@@ -207,6 +224,9 @@ export function RoutePanel({ api }: { api: ProjectApi }) {
       setRecheck((n) => n + 1);
     }
   };
+  // Die allgemeine Straßenberechnung sendet nie Foto-Orte; dafür gibt es die eigene Aktion unten.
+  const recomputeRoads = () => runBatch(estimatedRoad.map((seg) => ({ seg, via: [] })));
+  const routeThroughPhotos = () => runBatch(photoVias.map(({ segment, via }) => ({ seg: segment, via, photo: true })));
 
   const totalM = project.journey.segments.reduce((a, s) => a + s.distanceM, 0);
 
@@ -318,6 +338,14 @@ export function RoutePanel({ api }: { api: ProjectApi }) {
             {!online && <p className="small">{t('route.roadsHint', { router: ROUTER_NAME })}</p>}
             <button className="btn primary small" onClick={() => { setOnline(true); void recomputeRoads(); }} disabled={busy} data-testid="compute-roads">
               {online ? t('route.retryRoads') : t('route.computeRoads')}
+            </button>
+          </div>
+        )}
+        {photoVias.length > 0 && (
+          <div className="card" role="status" data-testid="photo-via-card">
+            <p className="small">{t('photos.viaHint', { router: ROUTER_NAME })}{viaMerged > 0 ? ' ' + t('photos.viaMerged', { n: viaMerged }) : ''}</p>
+            <button className="btn primary small" onClick={() => { setOnline(true); void routeThroughPhotos(); }} disabled={busy} data-testid="photo-via-apply">
+              {online ? t('photos.viaApply') : t('photos.viaApplyAllow')}
             </button>
           </div>
         )}

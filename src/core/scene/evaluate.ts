@@ -73,7 +73,7 @@ export interface SceneModel {
   photoMoments: PhotoMoment[];
 }
 
-function selectedGeometry(s: RouteSegment): GeoPoint[] {
+export function selectedGeometry(s: RouteSegment): GeoPoint[] {
   const alt = s.alternatives[s.selectedAlternative];
   return alt && s.selectedAlternative > 0 ? alt.geometry : s.geometry;
 }
