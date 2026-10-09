@@ -1,6 +1,7 @@
 import { haversineM, indexLine, nearestOnLine, unwrapLongitudes } from '../../core/geodesy';
 import type { Photo, Project, RouteSegment } from '../../core/project/schema';
 import type { GeoPoint, TransportMode } from '../../core/types';
+import { selectedGeometry } from '../../core/scene/evaluate';
 
 /** Modi, für die ein Online-Routing mit Zwischenpunkten möglich ist. */
 export const VIA_MODES: TransportMode[] = ['car', 'motorcycle', 'bike', 'walk'];
@@ -62,7 +63,7 @@ export function planPhotoVias(p: Project): ViaPlan {
   const segs = p.journey.segments.filter(segmentAcceptsVia);
   if (!placed.length || !segs.length) return { bySegment, merged: 0 };
   const total = p.journey.segments.reduce((a, s) => a + s.distanceM, 0);
-  const lines = segs.map((s) => ({ seg: s, index: indexLine(unwrapLongitudes(s.geometry)) }));
+  const lines = segs.map((s) => ({ seg: s, index: indexLine(unwrapLongitudes(selectedGeometry(s))) }));
   const radiusAt = (r: number) => clusterPoints(placed.map((x) => x.position), r);
 
   const assign = (clusters: { rep: GeoPoint }[]) => {

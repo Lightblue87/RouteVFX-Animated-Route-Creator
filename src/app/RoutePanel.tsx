@@ -9,7 +9,7 @@ import { addStop, applyControlPoints, appendGpxTrack, controlPointsOf, changeSeg
 import { GPX_MAX_BYTES, GpxError, parseGpx } from '../features/imports/gpx';
 import type { RouteSegment } from '../core/project/schema';
 import { PhotoPanel } from './PhotoPanel';
-import { planPhotoVias, segmentAcceptsVia, segmentsNeedingVia } from '../features/photos/viaPoints';
+import { planPhotoVias, segmentsNeedingVia } from '../features/photos/viaPoints';
 import { RoutingError, TRANSPORT_MODES, type GeoPoint, type TransportMode } from '../core/types';
 import { formatKm, type MessageKey } from '../i18n';
 
@@ -216,8 +216,8 @@ export function RoutePanel({ api }: { api: ProjectApi }) {
       setRecheck((n) => n + 1);
     }
   };
-  const viaFor = (seg: RouteSegment) => viaPlan.bySegment.get(seg.id) ?? [];
-  const recomputeRoads = () => runBatch(estimatedRoad.map((seg) => ({ seg, via: segmentAcceptsVia(seg) ? viaFor(seg) : [] })));
+  // Die allgemeine Straßenberechnung sendet nie Foto-Orte; dafür gibt es die eigene Aktion unten.
+  const recomputeRoads = () => runBatch(estimatedRoad.map((seg) => ({ seg, via: [] })));
   const routeThroughPhotos = () => runBatch(photoVias.map(({ segment, via }) => ({ seg: segment, via })));
 
   const totalM = project.journey.segments.reduce((a, s) => a + s.distanceM, 0);

@@ -53,3 +53,31 @@ test('Foto-Ort lenkt die Straßenroute: Zwischenpunkt wird nach Einwilligung an 
   expect(bodies[2]!.coordinates).toHaveLength(2);
   await expect(page.getByTestId('photo-via-card')).toHaveCount(0);
 });
+
+test('Die allgemeine Straßenberechnung sendet keine Foto-Orte (nur die eigene Aktion)', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('create-project').click();
+  const toggle = page.getByTestId('online-toggle');
+  test.skip(!/Supabase/.test((await toggle.locator('..').textContent()) ?? ''), 'Build ohne VITE_ROUTING_PROXY_URL');
+
+  const bodies: { coordinates: number[][] }[] = [];
+  await page.context().route(PROXY, async (route) => {
+    const req = route.request();
+    const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'content-type' };
+    if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
+    const body = req.postDataJSON() as { coordinates: number[][] };
+    bodies.push(body);
+    return route.fulfill({ status: 200, headers: cors, json: { routes: [{ coordinates: body.coordinates, distanceM: 120_000, durationS: 5000 }], attribution: 'ORS' } });
+  });
+
+  await addPlace(page, 'Hannover', /Hannover|Hanover/);
+  await addPlace(page, 'Bielefeld', /Bielefeld/);
+  await page.getByTestId('photo-input').setInputFiles(FIX('photo-gps.jpg'));
+  await expect(page.getByTestId('photo-item')).toHaveCount(1);
+  // Erst jetzt Einwilligung: Der Näherungsabschnitt wird berechnet – ohne Foto-Ort
+  await toggle.check();
+  await expect.poll(() => bodies.length, { timeout: 15_000 }).toBe(1);
+  expect(bodies[0]!.coordinates).toHaveLength(2);
+  // Foto-Routing bleibt eine eigene, ausdrückliche Aktion
+  await expect(page.getByTestId('photo-via-card')).toBeVisible();
+});

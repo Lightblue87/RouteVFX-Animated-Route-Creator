@@ -72,6 +72,17 @@ describe('Foto-Orte als Routen-Zwischenpunkte', () => {
     expect(planPhotoVias(p).bySegment.size).toBe(0);
   });
 
+  it('plant gegen die gewählte Alternative, nicht gegen die Hauptroute', () => {
+    const north = line([52.3, 9], [52.3, 19]); // ~33 km nördlich der Hauptroute (52,9 → 52,19)
+    const p = proj([[52.3, 14]], { alternatives: [{ geometry: line([52, 9], [52, 19]), distanceM: 685_000 }, { geometry: north, distanceM: 700_000 }] });
+    // Kurzer Abschnitt → Korridor 15 km: Das Foto (~33 km nördlich) liegt nur an der Alternative, nicht an der Hauptroute.
+    const seg = p.journey.segments[0]!;
+    seg.distanceM = 100_000; // Korridor 15 km
+    expect(planPhotoVias(p).bySegment.size).toBe(0);
+    seg.selectedAlternative = 1;
+    expect(planPhotoVias(p).bySegment.get('s1')).toHaveLength(1);
+  });
+
   it('meldet Abschnitte nur, wenn die gespeicherten Zwischenpunkte abweichen', () => {
     const p = proj([[52.1, 12]]);
     const need = segmentsNeedingVia(p);
