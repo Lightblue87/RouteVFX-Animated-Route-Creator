@@ -178,3 +178,31 @@ export function fitCamera(
   const cy = (y0 + y1) / 2 + (paddingPx.bottom - paddingPx.top) / 2 / scale;
   return { center: { lat: latFromMercatorY(cy), lon: lonFromMercatorX(cx) }, zoom: Math.max(0, zoom) };
 }
+
+/**
+ * Nächster Punkt einer Linie zu `p` (lokale ebene Näherung je Kante, für Abstände bis einige 100 km ausreichend).
+ * Liefert Abstand in Metern und die Distanz entlang der Linie bis zu diesem Punkt.
+ * Längengrade werden um ±360° verglichen (entfaltete Geometrie über die Datumsgrenze).
+ */
+export function nearestOnLine(index: LineIndex, p: GeoPoint): { distanceM: number; alongM: number } | null {
+  const { points, cumulative } = index;
+  if (points.length === 0) return null;
+  if (points.length === 1) return { distanceM: haversineM(points[0]!, p), alongM: 0 };
+  let best = { distanceM: Infinity, alongM: 0 };
+  for (const shift of [0, -360, 360]) {
+    const q = { lat: p.lat, lon: p.lon + shift };
+    const kx = Math.cos(toRad(q.lat)) * 111_320;
+    const ky = 110_574;
+    for (let i = 1; i < points.length; i++) {
+      const a = points[i - 1]!, b = points[i]!;
+      const ax = (a.lon - q.lon) * kx, ay = (a.lat - q.lat) * ky;
+      const bx = (b.lon - q.lon) * kx, by = (b.lat - q.lat) * ky;
+      const dx = bx - ax, dy = by - ay;
+      const len2 = dx * dx + dy * dy;
+      const t = len2 > 0 ? Math.min(1, Math.max(0, -(ax * dx + ay * dy) / len2)) : 0;
+      const d = Math.hypot(ax + dx * t, ay + dy * t);
+      if (d < best.distanceM) best = { distanceM: d, alongM: cumulative[i - 1]! + (cumulative[i]! - cumulative[i - 1]!) * t };
+    }
+  }
+  return best;
+}

@@ -39,7 +39,7 @@ export function Editor({ projectId, close }: { projectId: string; close: () => v
         if (!p) return setLoadError('not_found');
         setProject(p);
         // Beim Öffnen gibt es noch keine Undo-Historie: nicht mehr referenzierte Medien freigeben.
-        void pruneUnreferencedBlobs(p.id, p.audio ? [p.audio.assetId] : []).catch(() => undefined);
+        void pruneUnreferencedBlobs(p.id, [...(p.audio ? [p.audio.assetId] : []), ...p.photos.map((x) => x.assetId)]).catch(() => undefined);
       })
       .catch((e: Error) => setLoadError(e.message));
   }, [projectId]);

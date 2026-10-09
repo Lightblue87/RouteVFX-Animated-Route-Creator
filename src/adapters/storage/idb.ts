@@ -170,7 +170,19 @@ export async function duplicateProject(p: Project, title: string): Promise<Proje
       audio = { ...audio, assetId };
     }
   }
-  const copy = migrateAndValidate({ ...structuredClone(p), id, title: title.slice(0, 80), createdAt: now, modifiedAt: now, audio });
+  // Fotos: jede Kopie bekommt eigene Blob-IDs, damit sie das Löschen des Originals überlebt.
+  const photos = [];
+  for (const ph of p.photos) {
+    const b = (await blobs.get(ph.assetId)) as StoredBlob | undefined;
+    if (!b) {
+      photos.push(ph); // Blob fehlt bereits im Original: Verweis unverändert lassen statt Daten zu erfinden
+      continue;
+    }
+    const assetId = newId();
+    await blobs.put({ ...b, id: assetId, projectId: id });
+    photos.push({ ...ph, assetId });
+  }
+  const copy = migrateAndValidate({ ...structuredClone(p), id, title: title.slice(0, 80), createdAt: now, modifiedAt: now, audio, photos });
   try {
     await tx.objectStore('projects').put(copy);
     await tx.done;
