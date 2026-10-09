@@ -94,6 +94,11 @@ GPS-Aufzeichnung · Kartenlink-Import · Service-Worker-Update-Ablauf · Re-Rout
 - iPhone-Test: App erreicht den Proxy, Hinweis „Routinganbieter hat die Anfrage abgelehnt“ (`proxy_upstream`, 502) bei Garbsen → Girona (~1.258 km, Auto). Vermutete Ursache (**nicht verifiziert**): Anbieter-Limit für Alternativrouten. Gegenmaßnahme: einmaliger Wiederholungsversuch ohne Alternativen im Client (wirkt ohne Neudeploy); Proxy gibt zusätzlich den numerischen ORS-Fehlercode zur Diagnose aus (`upstreamCode`, nach Neudeploy).
 - Offen: Bestätigung auf dem Gerät, ob die Hauptroute über 1.200 km vom Anbieter berechnet wird (ORS-Distanzlimit des Profils unbekannt).
 
+### Kamera überarbeitet (2026-10-09)
+- Anlass: Geräte-Export Garbsen ↔ Girona (1.583 km, 15 s): Kartendrehung bis 39° pro Bild (Summe 1.108°), Fahrzeug-Spitzentempo 3× Durchschnitt, harter Zoomsprung am Start.
+- Umgesetzt (Unit-Tests `tests/unit/cameraQuality.test.ts`, Messung mit künstlicher 1.500-km-Route): sanftes Tempo (Spitze 1,5× statt 3×), Fahrtrichtung als Sehne über die halbe Bildbreite (max. 1,4° pro Bild, Summe 222°), Mischung aus nah (Start, Stopps, Ziel) und weit (lange Abschnitte), längerer Zoom von der Übersicht (bis 2,6 s), Ausblendung früher.
+- **Nicht verifiziert:** Eindruck im echten Export auf dem Gerät; Geländerelief/3D-Neigung und Vorausschau sind noch nicht Teil dieser Änderung.
+
 ### Nächste konkrete Schritte
 1. OpenFreeMap gegen den echten Dienst und im MP4-Export prüfen (außerhalb der Sandbox); Routing-Free-Tier (R-03): Bedingungen belegen, dann umsetzen.
 2. E2E: Hintergrund-Abbruch, Service-Worker-Update.
