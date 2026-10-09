@@ -26,6 +26,8 @@ Für den E2E-Export wird ein Chrome mit proprietären Codecs benötigt (z. B. *C
 
 `npm run data:build` erzeugt `public/geodata/*` reproduzierbar aus einem gepinnten Natural-Earth-Commit.
 
+**Test-Veröffentlichung:** Der Prototyp lässt sich per Hand auf GitHub Pages veröffentlichen (nicht indexierbar, keine offizielle Freigabe) – Einrichtung in `docs/TEST_DEPLOYMENT.md`.
+
 **Online-Routing (optional):** Straßen-/Rad-/Fußrouten über openrouteservice laufen über eine eigene Supabase Edge Function (`supabase/functions/route`, Einrichtung: `docs/SUPABASE_ROUTING.md`). Build mit `VITE_ROUTING_PROXY_URL=https://<projekt-ref>.supabase.co/functions/v1/route`. Ohne URL nutzt der Prototyp den FOSSGIS-OSRM-Demoserver. `npm run check:functions` prüft die Function mit Deno.
 
 ## Architektur (Kurz)

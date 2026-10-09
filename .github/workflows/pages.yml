@@ -1,0 +1,51 @@
+name: Test-Deployment (GitHub Pages)
+
+# Nur von Hand startbar (Actions → „Test-Deployment (GitHub Pages)“ → Run workflow) und nur vom Stand auf main.
+# Veröffentlicht die Prototyp-App unter https://<konto>.github.io/<repo>/ zum Selbsttesten (nicht indexierbar).
+# Voraussetzungen siehe docs/TEST_DEPLOYMENT.md.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - name: Build (mit Routing-Proxy, falls als Repository-Variable gesetzt)
+        run: |
+          if [ -z "$VITE_ROUTING_PROXY_URL" ]; then echo "::warning::Variable ROUTING_PROXY_URL nicht gesetzt – die App nutzt den FOSSGIS-OSRM-Prototyp statt des Supabase-Proxys."; fi
+          npm run build
+        env:
+          VITE_ROUTING_PROXY_URL: ${{ vars.ROUTING_PROXY_URL }}
+      - name: Als Testversion kennzeichnen (nicht indexieren)
+        run: |
+          grep -q '<meta charset="UTF-8" />' dist/index.html
+          sed -i 's#<meta charset="UTF-8" />#<meta charset="UTF-8" />\n    <meta name="robots" content="noindex, nofollow" />#' dist/index.html
+          grep -q 'name="robots"' dist/index.html
+          printf 'User-agent: *\nDisallow: /\n' > dist/robots.txt
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+      - id: deployment
+        uses: actions/deploy-pages@v4

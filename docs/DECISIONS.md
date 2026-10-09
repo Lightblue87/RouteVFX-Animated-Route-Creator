@@ -82,9 +82,9 @@ IndexedDB über `idb` 8.0.4 (ISC). Projekte als Zod-validiertes JSON (`schemaVer
 `buildSceneModel(project)` + `evaluateScene(model, tMs)` sind reine Funktionen. Vorschau und Export verwenden denselben Evaluator und denselben Overlay-Zeichner (`src/scene/drawOverlay.ts`). Kamera-Glättung erfolgt über ein symmetrisches Zeitfenster (zustandslos), daher identische Ergebnisse bei beliebiger Seek-Reihenfolge (Unit-Test).
 Logischer Viewport 540×960; Export skaliert per `pixelRatio` (2 → 1080p, 4 → 4K), damit das Framing auflösungsunabhängig ist.
 
-## ADR-008 Hosting (noch nicht veröffentlicht)
+## ADR-008 Hosting (nur Test-Veröffentlichung, keine öffentliche Freigabe)
 
-Statische Auslieferung (z. B. GitHub Pages oder Cloudflare Pages). Aktuelle Free-Plan-Grenzen **nicht** in dieser Sitzung verifiziert (E12). Keine Veröffentlichung vor Abnahme (CLAUDE.md §15/§16).
+Statische Auslieferung. **Test-Veröffentlichung auf GitHub Pages (Entscheidung des Produktverantwortlichen, 2026-10-09):** zum Selbsttesten auf echten Geräten, per Hand ausgelöst (`.github/workflows/pages.yml`, nur `workflow_dispatch`, nur Branch `main`), mit `noindex`/`robots.txt` und dem App-Hinweis „Prototyp – nicht veröffentlicht“; das Projekt ist nirgends beworben oder verlinkt. Kein Geld, keine Zahlungsmethode (Pages für öffentliche Repositories kostenlos; Site ≤ 1 GB, 100 GB/Monat weich – laut GitHub-Doku über Suche, E12). Einrichtung und Rückbau: `docs/TEST_DEPLOYMENT.md`. Das ist **keine** Freigabe im Sinne von CLAUDE.md §15/§16 (Abnahmetests auf Geräten stehen aus); die Release-Matrix bleibt offen. Für den späteren echten Start sind Domain, Datenschutzerklärung/Impressum und Kill-Switch-Prüfung (Phase 5) nötig.
 
 ## ADR-009 Branding
 
