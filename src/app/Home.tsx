@@ -41,7 +41,10 @@ export function Home({ open }: { open: (id: string) => void }) {
   return (
     <div className="screen home">
       <header className="topbar">
-        <h1>{t('app.name')}</h1>
+        <h1 className="brand">
+          <img src={`${import.meta.env.BASE_URL}icons/routevfx-logo.png`} alt="" width={132} className="brand-logo" />
+          <span className="sr-only">{t('app.name')}</span>
+        </h1>
         <button className="btn ghost" onClick={() => setLocale(locale === 'de' ? 'en' : 'de')} aria-label="Language">
           {t('lang.switch')}
         </button>

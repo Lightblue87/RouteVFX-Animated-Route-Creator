@@ -23,6 +23,9 @@
 html, body, #root { margin: 0; height: 100%; background: var(--bg); color: var(--text); }
 body { overscroll-behavior: none; }
 h1 { font-size: 22px; margin: 0; }
+.brand { line-height: 0; }
+.brand-logo { display: block; height: auto; mix-blend-mode: multiply; } /* weißer Logo-Hintergrund verschwindet auf dem hellen App-Hintergrund */
+@media (prefers-color-scheme: dark) { .brand-logo { mix-blend-mode: normal; border-radius: 14px; } }
 h2 { font-size: 18px; margin: 20px 0 8px; }
 h3 { font-size: 16px; margin: 14px 0 6px; }
 .screen { min-height: 100%; padding: max(env(safe-area-inset-top), 12px) 16px max(env(safe-area-inset-bottom), 12px); max-width: 720px; margin: 0 auto; }
