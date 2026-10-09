@@ -12,7 +12,7 @@ Stand: 2026-10-08 (Prototyp, keine Rechtsberatung – rechtliche Prüfung vor Re
 | Ziel | Übertragene Daten | Auslöser | Zweck |
 |---|---|---|---|
 | Supabase Edge Function „route“ (eigenes Projekt, wenn eingerichtet) → api.heigit.org/openrouteservice (HeiGIT gGmbH) | Verkehrsmittel, Koordinaten von Start/Wegpunkten/Ziel (6 Nachkommastellen); IP-Adresse nur bei Supabase. In der DB nur täglich wechselnder, gesalzener IP-Hash + Zähler (7 Tage). Keine Koordinaten gespeichert/geloggt; an ORS geht die IP der Function, nicht die des Nutzers | Berechnung eines Auto/Motorrad/Rad/Fuß-Abschnitts (Opt-in) | Straßenroute |
-| routing.openstreetmap.de (FOSSGIS) – nur ohne eingerichteten Proxy | Koordinaten von Start/Ziel (6 Nachkommastellen), IP-Adresse, Referer | Berechnung eines Auto/Motorrad/Rad/Fuß-Abschnitts | Straßenroute |
+| routing.openstreetmap.de (FOSSGIS) – nur ohne eingerichteten Proxy | Koordinaten von Start/Ziel (6 Nachkommastellen) und – nur nach ausdrücklichem Klick auf „Route über Foto-Orte berechnen“ – die Foto-Orte als Zwischenpunkte, IP-Adresse, Referer | Berechnung eines Auto/Motorrad/Rad/Fuß-Abschnitts | Straßenroute |
 | nominatim.openstreetmap.org (OSMF) | Suchbegriff, Sprache, IP-Adresse, Referer | Tippen auf „Online suchen“ bzw. Enter | Ortssuche |
 | tiles.openfreemap.org (OpenFreeMap) | Angefragte Kacheln (→ betrachteter Kartenausschnitt), IP-Adresse, Referer; keine Stopps/Tracks, keine Cookies | Auswahl des Kartenstils „OpenFreeMap“ (mit Hinweis im UI) | Detailkarte in Vorschau, Planung und Export |
 
@@ -40,4 +40,4 @@ Nach erstmaliger Nutzung eines Online-Dienstes wird `privacy.usedOnlineServices 
 - Supabase (Auftragsverarbeitung, Region EU wählen) und HeiGIT/openrouteservice in die Datenschutzerklärung aufnehmen; AV-Vertrag mit Supabase prüfen (E14).
 - GPS-Aufzeichnung (nicht implementiert): Berechtigung nur auf Nutzeraktion, Daten nur lokal.
 - Mikrofon (Voice-over, nicht implementiert): nur auf Anforderung.
-- Foto-Routing: Nur nach ausdrücklichem Klick auf „Route über Foto-Orte berechnen“ (und Einwilligung in den Online-Dienst) werden die Foto-Orte als Koordinaten zusammen mit Start und Ziel an den Routingdienst gesendet. Bilder und Dateinamen werden nie übertragen.
+- Foto-Routing: Nur nach ausdrücklichem Klick auf „Route über Foto-Orte berechnen“ (und Einwilligung in den Online-Dienst) werden die Foto-Orte als Koordinaten zusammen mit Start und Ziel an den jeweils eingesetzten Routingdienst gesendet (Supabase-Proxy → openrouteservice, ohne Proxy direkt FOSSGIS). Bilder und Dateinamen werden nie übertragen.

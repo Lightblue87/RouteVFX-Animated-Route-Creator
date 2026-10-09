@@ -54,28 +54,29 @@ export interface ViaPlan {
 
 /**
  * Welche Zwischenpunkte sollen die Straßenabschnitte aus den Foto-Orten bekommen?
- * Fotos werden (abhängig von der Gesamtlänge) zu Orten zusammengefasst, dann dem nächstgelegenen berechenbaren
- * Abschnitt zugeordnet, sofern sie in dessen Korridor liegen, und entlang des Abschnitts sortiert.
+ * Jedes Foto gehört zum nächstgelegenen Abschnitt der *gesamten* Reise (wie bei der Wiedergabe im Video); nur wenn dieser
+ * Abschnitt Zwischenpunkte annimmt und das Foto in seinem Korridor liegt, lenkt es die Route. Danach wird je Abschnitt
+ * (abhängig von der Gesamtlänge) zu Orten zusammengefasst und entlang des Abschnitts sortiert.
  */
 export function planPhotoVias(p: Project): ViaPlan {
   const bySegment = new Map<string, GeoPoint[]>();
   const placed = p.photos.filter((x): x is Photo & { position: GeoPoint } => !!x.position);
-  const segs = p.journey.segments.filter(segmentAcceptsVia);
-  if (!placed.length || !segs.length) return { bySegment, merged: 0 };
+  if (!placed.length || !p.journey.segments.some(segmentAcceptsVia)) return { bySegment, merged: 0 };
   const total = p.journey.segments.reduce((a, s) => a + s.distanceM, 0);
-  const lines = segs.map((s) => ({ seg: s, index: indexLine(unwrapLongitudes(selectedGeometry(s))) }));
+  const lines = p.journey.segments.map((s) => ({ seg: s, index: indexLine(unwrapLongitudes(selectedGeometry(s))) }));
 
-  // 1) Jedes Foto einzeln dem nächstgelegenen Abschnitt zuordnen, sofern es in dessen Korridor liegt.
+  // 1) Jedes Foto einzeln dem nächstgelegenen Abschnitt der ganzen Reise zuordnen (Gleichstand: der frühere gewinnt).
   const assigned = new Map<string, { pt: GeoPoint; along: number }[]>();
   for (const photo of placed) {
-    let best: { id: string; d: number; along: number } | null = null;
+    let best: { seg: RouteSegment; d: number; along: number } | null = null;
     for (const { seg, index } of lines) {
       const n = nearestOnLine(index, photo.position);
-      if (!n) continue;
-      const lim = Math.min(CORRIDOR_MAX_M, Math.max(CORRIDOR_MIN_M, seg.distanceM * CORRIDOR_FRACTION));
-      if (n.distanceM <= lim && (!best || n.distanceM < best.d)) best = { id: seg.id, d: n.distanceM, along: n.alongM };
+      if (n && (!best || n.distanceM < best.d - 1e-6)) best = { seg, d: n.distanceM, along: n.alongM };
     }
-    if (best) assigned.set(best.id, [...(assigned.get(best.id) ?? []), { pt: photo.position, along: best.along }]);
+    if (!best || !segmentAcceptsVia(best.seg)) continue; // z. B. Zug, GPX oder bearbeitet: das Foto gehört dorthin
+    const lim = Math.min(CORRIDOR_MAX_M, Math.max(CORRIDOR_MIN_M, best.seg.distanceM * CORRIDOR_FRACTION));
+    if (best.d > lim) continue;
+    assigned.set(best.seg.id, [...(assigned.get(best.seg.id) ?? []), { pt: photo.position, along: best.along }]);
   }
 
   // 2) Erst danach je Abschnitt zusammenfassen: Ein Foto außerhalb des Korridors kann gültige nicht mehr verdrängen.

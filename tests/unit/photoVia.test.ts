@@ -93,6 +93,17 @@ describe('Foto-Orte als Routen-Zwischenpunkte', () => {
     expect(v![0]!.lat).toBeCloseTo(52.0045, 4);
   });
 
+  it('ein Foto, das einem Zug-/bearbeiteten Abschnitt am nächsten liegt, lenkt keinen Straßenabschnitt um', () => {
+    const p = proj([[52.01, 14]]); // 1,1 km neben der Straße (Korridor ≥ 1 km)
+    const road = p.journey.segments[0]!;
+    // Zugabschnitt direkt am Foto (Gleichstand ausgeschlossen: 0,2 km Abstand)
+    p.journey.segments.push({ ...road, id: 's2', mode: 'train', confidence: 'estimated', geometry: line([52.012, 13], [52.012, 15]) });
+    expect(planPhotoVias(p).bySegment.size).toBe(0);
+    // Ohne den Zugabschnitt gehört das Foto zur Straße
+    p.journey.segments.pop();
+    expect(planPhotoVias(p).bySegment.get('s1')).toHaveLength(1);
+  });
+
   it('meldet Abschnitte nur, wenn die gespeicherten Zwischenpunkte abweichen', () => {
     const p = proj([[52.1, 12]]);
     const need = segmentsNeedingVia(p);
