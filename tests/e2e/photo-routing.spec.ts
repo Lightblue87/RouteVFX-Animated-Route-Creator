@@ -81,3 +81,42 @@ test('Die allgemeine Straßenberechnung sendet keine Foto-Orte (nur die eigene A
   // Foto-Routing bleibt eine eigene, ausdrückliche Aktion
   await expect(page.getByTestId('photo-via-card')).toBeVisible();
 });
+
+test('Foto wird während der Berechnung entfernt: das Ergebnis mit dem alten Foto-Ort wird nicht übernommen', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('create-project').click();
+  const toggle = page.getByTestId('online-toggle');
+  test.skip(!/Supabase/.test((await toggle.locator('..').textContent()) ?? ''), 'Build ohne VITE_ROUTING_PROXY_URL');
+
+  let release: () => void = () => undefined;
+  const gate = new Promise<void>((r) => { release = r; });
+  const bodies: { coordinates: number[][] }[] = [];
+  await page.context().route(PROXY, async (route) => {
+    const req = route.request();
+    const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'content-type' };
+    if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
+    const body = req.postDataJSON() as { coordinates: number[][] };
+    bodies.push(body);
+    if (body.coordinates.length === 3) await gate; // Antwort mit Foto-Ort wird festgehalten
+    const km = body.coordinates.length === 3 ? 333_000 : 120_000;
+    return route.fulfill({ status: 200, headers: cors, json: { routes: [{ coordinates: body.coordinates, distanceM: km, durationS: 5000 }], attribution: 'ORS' } });
+  });
+
+  await addPlace(page, 'Hannover', /Hannover|Hanover/);
+  await addPlace(page, 'Bielefeld', /Bielefeld/);
+  await toggle.check();
+  await expect.poll(() => bodies.length, { timeout: 15_000 }).toBe(1);
+  await expect(page.getByTestId('segment-confidence')).toHaveText(/Anbieterroute|Provider route/);
+  await page.getByTestId('photo-input').setInputFiles(FIX('photo-gps.jpg'));
+  await page.getByTestId('photo-via-apply').click();
+  await expect.poll(() => bodies.length, { timeout: 15_000 }).toBe(2);
+  // Foto entfernen, während die Antwort noch aussteht
+  await page.getByTestId('photo-remove').click();
+  release();
+  await expect(page.getByTestId('photo-item')).toHaveCount(0);
+  await page.waitForTimeout(800);
+  // Weder die 333-km-Route noch eine neue Anfrage; keine Aufforderung mehr nötig
+  await expect(page.getByTestId('segment')).not.toContainText('333');
+  expect(bodies).toHaveLength(2);
+  await expect(page.getByTestId('photo-via-card')).toHaveCount(0);
+});
