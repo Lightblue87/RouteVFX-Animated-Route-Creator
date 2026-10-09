@@ -82,3 +82,26 @@ describe('Kamera-Übergang hält das Fahrzeug im Bild', () => {
     }
   });
 });
+
+describe('Fahrzeug-Illustration', () => {
+  it('zeichnet jedes Verkehrsmittel ohne Fehler und stellt den Canvas-Zustand wieder her', async () => {
+    const { drawVehicleFigure } = await import('../../src/scene/drawOverlay');
+    const { TRANSPORT_MODES } = await import('../../src/core/types');
+    for (const mode of TRANSPORT_MODES) {
+      let depth = 0;
+      let paints = 0;
+      const ctx = new Proxy({} as Record<string, unknown>, {
+        get: (t, k: string) => {
+          if (k === 'save') return () => depth++;
+          if (k === 'restore') return () => depth--;
+          if (k === 'fill' || k === 'stroke' || k === 'fillRect' || k === 'strokeRect') return () => paints++;
+          return k in t ? t[k] : () => undefined;
+        },
+        set: (t, k: string, v) => ((t[k] = v), true),
+      }) as unknown as CanvasRenderingContext2D;
+      drawVehicleFigure(ctx, mode, 100, 100, 1.2, '#ffffff');
+      expect(depth, mode).toBe(0);
+      expect(paints, mode).toBeGreaterThan(0);
+    }
+  });
+});

@@ -89,6 +89,11 @@ export function AnimatePanel({ api }: { api: ProjectApi }) {
             </div>
           </div>
         ))}
+        <label className="field small">{t('anim.vehicleStyle')}
+          <select value={project.vehicleStyle} data-testid="vehicle-style" onChange={(e) => set({ vehicleStyle: e.target.value as 'symbol' | 'figure' })}>
+            {(['figure', 'symbol'] as const).map((k) => <option key={k} value={k}>{t(`anim.vehicle.${k}`)}</option>)}
+          </select>
+        </label>
         <fieldset>
           <legend>{t('anim.overlays')}</legend>
           {(Object.keys(project.overlays) as (keyof Project['overlays'])[]).map((k) => (

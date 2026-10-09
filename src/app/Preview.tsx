@@ -57,6 +57,7 @@ export function Preview({ project }: { project: Project }) {
       locale: loc,
       overlays: m.project.overlays,
       vehicleColor: m.project.vehicleColor,
+      vehicleStyle: m.project.vehicleStyle,
       attribution: styleInfo.attribution,
       dark: styleInfo.variant === 'dark',
       scale: c.width / LOGICAL_VIEWPORT.width,

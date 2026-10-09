@@ -110,6 +110,7 @@ export async function exportMp4(req: ExportRequest): Promise<ExportResult> {
       locale: req.locale,
       overlays: project.overlays,
       vehicleColor: project.vehicleColor,
+      vehicleStyle: project.vehicleStyle,
       attribution: [...attributions].join(' · '),
       dark: styleInfo.variant === 'dark',
     };
