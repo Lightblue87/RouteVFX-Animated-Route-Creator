@@ -17,6 +17,7 @@ export const en: Record<keyof typeof de, string> = {
   'common.saving': 'Saving …',
   'common.saveError': 'Saving failed',
   'common.quotaError': 'Storage full – project could not be saved.',
+  'common.outdatedError': "This project was saved by a newer app version – please reload the page. Changes were not saved.",
   'common.undo': 'Undo',
   'common.redo': 'Redo',
   'common.confirmDelete': 'Really delete project “{title}”? This cannot be undone.',

@@ -8,7 +8,7 @@ import { AnimatePanel } from './AnimatePanel';
 const ExportPanel = lazy(() => import('./ExportPanel').then((m) => ({ default: m.ExportPanel })));
 
 type Tab = 'route' | 'animate' | 'export';
-type SaveState = 'saved' | 'saving' | 'error' | 'quota';
+type SaveState = 'saved' | 'saving' | 'error' | 'quota' | 'outdated';
 
 export interface ProjectApi {
   project: Project;
@@ -57,7 +57,7 @@ export function Editor({ projectId, close }: { projectId: string; close: () => v
         journalClearIfSame(p);
         setSave('saved');
       })
-      .catch((e) => setSave(e instanceof StorageError && e.code === 'quota' ? 'quota' : 'error'));
+      .catch((e) => setSave(e instanceof StorageError ? (e.code === 'quota' ? 'quota' : e.code === 'newer_version' ? 'outdated' : 'error') : 'error'));
   }, []);
   const flush = useCallback(() => {
     const p = pending.current;
@@ -132,7 +132,7 @@ export function Editor({ projectId, close }: { projectId: string; close: () => v
   if (!project) return <div className="screen center" aria-busy="true">…</div>;
 
   const api: ProjectApi = { project, commit, commitDerived };
-  const saveLabel = { saved: t('common.saved'), saving: t('common.saving'), error: t('common.saveError'), quota: t('common.quotaError') }[save];
+  const saveLabel = { saved: t('common.saved'), saving: t('common.saving'), error: t('common.saveError'), quota: t('common.quotaError'), outdated: t('common.outdatedError') }[save];
 
   return (
     <div className="screen editor">

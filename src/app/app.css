@@ -63,7 +63,7 @@ h3 { font-size: 16px; margin: 14px 0 6px; }
 .badge.conf.derived { background: #fff4d6; color: #6b4200; }
 .badge.conf.provider_verified, .badge.conf.imported_recorded { background: #dcf5e3; color: #0d5c25; }
 .save { font-size: 13px; color: var(--muted); }
-.save.error, .save.quota { color: var(--danger); }
+.save.error, .save.quota, .save.outdated { color: var(--danger); }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 .diag { font-size: 12px; white-space: pre-wrap; text-align: left; max-width: 100%; }
 .panel { display: flex; flex-direction: column; gap: 12px; padding-bottom: 24px; }

@@ -15,6 +15,7 @@ export const de = {
   'common.saving': 'Speichert …',
   'common.saveError': 'Speichern fehlgeschlagen',
   'common.quotaError': 'Speicher voll – Projekt konnte nicht gesichert werden.',
+  'common.outdatedError': "Dieses Projekt wurde mit einer neueren App-Version gespeichert – bitte die Seite neu laden. Änderungen wurden nicht gesichert.",
   'common.undo': 'Rückgängig',
   'common.redo': 'Wiederholen',
   'common.confirmDelete': 'Projekt „{title}“ wirklich löschen? Dies kann nicht rückgängig gemacht werden.',

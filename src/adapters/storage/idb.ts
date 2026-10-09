@@ -57,7 +57,7 @@ export async function _resetDbHandle(): Promise<void> {
 }
 
 export class StorageError extends Error {
-  constructor(public readonly code: 'quota' | 'unknown', message: string) {
+  constructor(public readonly code: 'quota' | 'newer_version' | 'unknown', message: string) {
     super(message);
     this.name = 'StorageError';
   }
@@ -73,8 +73,19 @@ export async function saveProject(p: Project): Promise<void> {
   // Vor dem Schreiben validieren – verhindert das Persistieren inkonsistenter Zustände.
   const valid = migrateAndValidate(p);
   try {
-    await (await db()).put('projects', valid);
+    // Ein veralteter Tab (älterer App-Stand) darf einen neueren Datensatz nicht überschreiben: Er würde Felder
+    // verlieren, die er nicht kennt (z. B. Fotos), und deren Bilddaten später zum Aufräumen freigeben.
+    const tx = (await db()).transaction('projects', 'readwrite');
+    const stored = (await tx.store.get(valid.id)) as { schemaVersion?: number } | undefined;
+    if (typeof stored?.schemaVersion === 'number' && stored.schemaVersion > valid.schemaVersion) {
+      tx.abort();
+      await tx.done.catch(() => undefined);
+      throw new StorageError('newer_version', 'stored project is newer than this app version');
+    }
+    await tx.store.put(valid);
+    await tx.done;
   } catch (e) {
+    if (e instanceof StorageError) throw e;
     wrap(e);
   }
 }
@@ -113,6 +124,7 @@ export async function recoverJournals(): Promise<void> {
         await saveProject(journal);
         journalClearIfSame(journal);
       } catch (e) {
+        if (e instanceof StorageError && e.code === 'newer_version') continue; // neuerer Datensatz: Journal behalten, nicht überschreiben
         if (e instanceof StorageError) complete = false; // später erneut versuchen, Journal behalten
         else journalRemove(id); // unlesbar/ungültig: verwerfen
       }
