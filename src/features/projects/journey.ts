@@ -76,11 +76,11 @@ export async function fillMissingSegments(p: Project, settings: RoutingSettings,
   return { project: normalizeSegments(project), notices };
 }
 
-export async function computeSegment(from: Stop, to: Stop, mode: TransportMode, settings: RoutingSettings, signal: AbortSignal | undefined, notices: string[], usage?: { online: boolean }): Promise<RouteSegment> {
-  const { results, fallbackReason, usedOnline } = await routeSegment({ start: from.position, end: to.position, via: [], mode }, settings, signal);
+export async function computeSegment(from: Stop, to: Stop, mode: TransportMode, settings: RoutingSettings, signal: AbortSignal | undefined, notices: string[], usage?: { online: boolean }, via: GeoPoint[] = []): Promise<RouteSegment> {
+  const { results, fallbackReason, usedOnline } = await routeSegment({ start: from.position, end: to.position, via, mode }, settings, signal);
   if (usage && usedOnline) usage.online = true;
   if (fallbackReason) notices.push(fallbackReason);
-  const seg = segmentFromResult(from, to, mode, results);
+  const seg = segmentFromResult(from, to, mode, results, via);
   if (fallbackReason) seg.warnings = [...seg.warnings, fallbackReason];
   return seg;
 }
@@ -89,14 +89,14 @@ export async function computeSegment(from: Stop, to: Stop, mode: TransportMode, 
  * Berechnet einen Abschnitt mit neuem Verkehrsmittel. Gibt nur das neue Segment zurück; eingespielt wird es
  * über replaceSegmentIfUnchanged, damit eine langsame Routing-Antwort keine zwischenzeitlichen Änderungen überschreibt.
  */
-export async function changeSegmentMode(p: Project, segId: string, mode: TransportMode, settings: RoutingSettings, signal?: AbortSignal): Promise<{ base: RouteSegment; segment: RouteSegment; notices: string[]; usedOnline: boolean } | null> {
+export async function changeSegmentMode(p: Project, segId: string, mode: TransportMode, settings: RoutingSettings, signal?: AbortSignal, via: GeoPoint[] = []): Promise<{ base: RouteSegment; segment: RouteSegment; notices: string[]; usedOnline: boolean } | null> {
   const old = p.journey.segments.find((s) => s.id === segId);
   if (!old) return null;
   const from = p.journey.stops.find((s) => s.id === old.fromStopId)!;
   const to = p.journey.stops.find((s) => s.id === old.toStopId)!;
   const notices: string[] = [];
   const usage = { online: false };
-  const seg = await computeSegment(from, to, mode, settings, signal, notices, usage);
+  const seg = await computeSegment(from, to, mode, settings, signal, notices, usage, via);
   seg.lineStyle = { ...defaultLineStyle(mode), widthPx: old.lineStyle.widthPx };
   seg.manualDurationMs = old.manualDurationMs;
   return { base: old, segment: seg, notices, usedOnline: usage.online };
