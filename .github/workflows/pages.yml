@@ -44,7 +44,8 @@ jobs:
           grep -q '<meta charset="UTF-8" />' dist/index.html
           sed -i 's#<meta charset="UTF-8" />#<meta charset="UTF-8" />\n    <meta name="robots" content="noindex, nofollow" />#' dist/index.html
           grep -q 'name="robots"' dist/index.html
-          printf 'User-agent: *\nDisallow: /\n' > dist/robots.txt
+          printf 'User-agent: *\nAllow: /icons/\nDisallow: /\n' > dist/robots.txt
+          grep -q 'Allow: /icons/' dist/robots.txt
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
