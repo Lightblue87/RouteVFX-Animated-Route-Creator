@@ -5,7 +5,8 @@ import { CURRENT_SCHEMA_VERSION, ProjectSchema, type Project } from './schema';
  * Unbekannte/neuere Versionen werden nicht verändert, sondern als Fehler gemeldet (kein stilles Löschen).
  */
 const MIGRATIONS: Record<number, (raw: Record<string, unknown>) => Record<string, unknown>> = {
-  // 1: Ausgangsversion – noch keine Migration nötig.
+  // 1 → 2: Fotos (leer) und Fahrzeugdarstellung ergänzen; alles andere bleibt unverändert.
+  1: (raw) => ({ ...raw, schemaVersion: 2, photos: Array.isArray(raw.photos) ? raw.photos : [], vehicleStyle: raw.vehicleStyle ?? 'symbol' }),
 };
 
 export class ProjectLoadError extends Error {

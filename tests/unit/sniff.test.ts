@@ -8,6 +8,22 @@ const bytes = (...parts: (string | number[])[]) =>
   Uint8Array.from(parts.flatMap((p) => (typeof p === 'string' ? [...p].map((c) => c.charCodeAt(0)) : p)));
 const u32 = (n: number) => [(n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255];
 
+/** ISO-BMFF-Box aus Typ und Inhalt. */
+const box = (type: string, ...content: (string | number[] | Uint8Array)[]) => {
+  const body = Uint8Array.from(content.flatMap((p) => (typeof p === 'string' ? [...p].map((c) => c.charCodeAt(0)) : [...p])));
+  return bytes(u32(8 + body.length), type, [...body]);
+};
+const ispe = (w: number, h: number) => box('ispe', u32(0), u32(w), u32(h));
+/** HEIC mit Hauptelement `primary`; Eigenschaft 1 = 160×120 (Vorschau), 2 = 8064×6048 (Hauptbild). */
+function buildHeic(o: { primary: number; primaryIdx: 1 | 2; decoy?: boolean; metaFirst?: boolean }) {
+  const ipco = box('ipco', ispe(160, 120), ispe(8064, 6048));
+  const ipma = box('ipma', [0, 0, 0, 0], u32(2), [0, 1, 1, 0x80 | o.primaryIdx], [0, 2, 1, 0x01]); // Element 1 → primaryIdx, Element 2 → Eigenschaft 1
+  const meta = box('meta', u32(0), box('pitm', [0, 0, 0, 0], [0, o.primary]), box('iprp', ipco, ipma));
+  const ftyp = box('ftyp', 'heic', u32(0), 'mif1');
+  const decoy = box('free', 'ispe', u32(0), u32(10), u32(10)); // täuschende Bytes außerhalb der Struktur
+  return o.decoy ? bytes([...ftyp], [...decoy], [...meta]) : bytes([...ftyp], [...meta]);
+}
+
 describe('Bildtyp und Größe aus dem Dateikopf', () => {
   it('erkennt JPEG samt Größe (echte Datei) – unabhängig vom MIME-Typ', () => {
     const b = fixture('photo-gps.jpg');
@@ -25,9 +41,26 @@ describe('Bildtyp und Größe aus dem Dateikopf', () => {
     expect(readImageSize(vp8l, 'webp')).toEqual({ width: 1000, height: 500 });
     const vp8 = bytes('RIFF', u32(0), 'WEBP', 'VP8 ', u32(10), [0, 0, 0], [0x9d, 0x01, 0x2a], [0x40, 0x06], [0xb0, 0x04]); // 1600×1200
     expect(readImageSize(vp8, 'webp')).toEqual({ width: 1600, height: 1200 });
-    const heic = bytes(u32(24), 'ftyp', 'heic', u32(0), 'mif1', u32(20), 'ispe', u32(0), u32(160), u32(120), u32(20), 'ispe', u32(0), u32(8064), u32(6048));
+    const heic = buildHeic({ primary: 1, primaryIdx: 2 });
     expect(sniffImage(heic)).toBe('heic');
     expect(readImageSize(heic, 'heic')).toEqual({ width: 8064, height: 6048 });
+  });
+  it('HEIC: folgt der Struktur (Hauptelement → Eigenschaft), ignoriert täuschende ispe-Bytes und beweist sonst nichts', () => {
+    expect(readImageSize(buildHeic({ primary: 1, primaryIdx: 2, decoy: true }), 'heic')).toEqual({ width: 8064, height: 6048 });
+    expect(readImageSize(buildHeic({ primary: 1, primaryIdx: 1, decoy: true }), 'heic')).toEqual({ width: 160, height: 120 });
+    expect(readImageSize(buildHeic({ primary: 2, primaryIdx: 2 }), 'heic')).toEqual({ width: 160, height: 120 }); // Element 2 → Eigenschaft 1
+    expect(readImageSize(buildHeic({ primary: 9, primaryIdx: 2 }), 'heic')).toBeNull(); // Hauptelement ohne Zuordnung
+    // nur die täuschenden Bytes, keine Struktur → nicht belegbar
+    const fake = bytes([...box('ftyp', 'heic', u32(0), 'mif1')], [...box('free', ispe(10, 10))]);
+    expect(readImageSize(fake, 'heic')).toBeNull();
+    // abgeschnitten (meta unvollständig) → nicht belegbar, kein Fehler
+    const ok = buildHeic({ primary: 1, primaryIdx: 2 });
+    for (const n of [0, 8, 20, 40, 60, ok.length - 10]) expect(readImageSize(ok.slice(0, n), 'heic')).toBeNull();
+    for (let seed = 1; seed <= 200; seed++) {
+      const c = ok.slice();
+      for (let k = 0; k < 6; k++) c[(seed * 7919 + k * 104729) % c.length] = (seed * 31 + k * 17) & 255;
+      expect(() => readImageSize(c, 'heic')).not.toThrow();
+    }
   });
   it('erkennt Überdimensioniertes am Kopf, ohne zu dekodieren', () => {
     const b = fixture('photo-gps.jpg').slice();

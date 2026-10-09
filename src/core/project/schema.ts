@@ -2,7 +2,9 @@ import { z } from 'zod';
 import { MAX_DURATION_MS, MIN_DURATION_MS, ROUTE_CONFIDENCES, TRANSPORT_MODES } from '../types';
 
 // Versioniertes, anbieterneutrales Projektmodell. Änderungen nur über Migrationen (migrations.ts).
-export const CURRENT_SCHEMA_VERSION = 1;
+// Version 2: Fotos (`photos`). Ältere App-Stände (Version 1) lehnen Version-2-Projekte als „neuer“ ab, statt unbekannte
+// Felder still zu verwerfen – sonst würde ein alter Tab beim Aufräumen die Foto-Daten löschen.
+export const CURRENT_SCHEMA_VERSION = 2;
 
 export const GeoPointSchema = z.object({
   lat: z.number().min(-90).max(90),

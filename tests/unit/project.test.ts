@@ -11,6 +11,17 @@ describe('project model', () => {
     expect(migrateAndValidate(JSON.parse(JSON.stringify(p)))).toEqual(p);
     expect(validateJourney(p)).toEqual([]);
   });
+  it('Version 1 wird auf 2 gehoben (Fotos leer); ein älterer Stand würde Version 2 als „neuer“ ablehnen', () => {
+    const { photos: _p, vehicleStyle: _v, ...base } = createProject('de');
+    const migrated = migrateAndValidate({ ...base, schemaVersion: 1 });
+    expect(migrated.schemaVersion).toBe(2);
+    expect(migrated.photos).toEqual([]);
+    expect(migrated.vehicleStyle).toBe('symbol');
+    // erneutes Migrieren eines aktuellen Projekts ändert nichts (idempotent)
+    expect(migrateAndValidate(JSON.parse(JSON.stringify(migrated)))).toEqual(migrated);
+    // ein Stand, der nur Version 1 kennt, würde dieses Projekt ablehnen statt es zu verstümmeln
+    expect(() => migrateAndValidate({ ...migrated, schemaVersion: 3 })).toThrowError(ProjectLoadError);
+  });
   it('rejects newer schema versions without modifying data', () => {
     const p = { ...createProject('de'), schemaVersion: 99 };
     expect(() => migrateAndValidate(p)).toThrowError(ProjectLoadError);
