@@ -45,3 +45,29 @@ test('Linie bearbeiten: Karte bleibt beim Scrollen oben stehen und wird nicht ü
   await page.getByTestId('edit-done').click();
   await expect(map).not.toHaveClass(/editing/);
 });
+
+test('Linie bearbeiten im Querformat: „Fertig“ bleibt erreichbar (Karte füllt nicht die ganze Fläche)', async ({ page }) => {
+  await page.setViewportSize({ width: 844, height: 390 });
+  await page.goto('/');
+  await page.getByTestId('create-project').click();
+  await addPlace(page, 'Hannover', /Hannover|Hanover/);
+  await addPlace(page, 'Braunschweig', /Braunschweig/);
+  await addPlace(page, 'Bielefeld', /Bielefeld/);
+  await expect(page.getByTestId('segment')).toHaveCount(2);
+  await page.getByTestId('segment-edit').first().click();
+  const map = page.getByTestId('planner-map');
+  await expect(map).toHaveClass(/editing/);
+  const body = page.locator('.tabbody');
+  // Karte darf nicht die gesamte Scrollfläche belegen und scrollt auf kurzen Bildschirmen normal mit
+  const scrollH = (await body.boundingBox())!.height;
+  const mapH = (await map.boundingBox())!.height;
+  const barH = (await page.getByTestId('edit-done').locator('..').boundingBox())!.height;
+  const sticky = await map.evaluate((el) => getComputedStyle(el).position === 'sticky');
+  console.info(`Querformat: Scrollfläche ${scrollH}, Karte ${mapH}, Leiste ${barH}, sticky=${sticky}`);
+  // Entweder scrollt die Karte normal mit, oder für Liste/Leiste bleibt mindestens ein Drittel der Fläche
+  if (sticky) expect(scrollH - mapH - barH).toBeGreaterThan(scrollH / 3);
+  await body.evaluate((el) => el.scrollTo(0, 300));
+  // Normales Klicken (ohne force) muss gelingen – schlägt fehl, wenn die Karte die Leiste verdeckt
+  await page.getByTestId('edit-done').click({ timeout: 5000 });
+  await expect(map).not.toHaveClass(/editing/);
+});
