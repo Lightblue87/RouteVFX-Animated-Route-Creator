@@ -6,7 +6,7 @@
 const BUILD_ID = '__BUILD_ID__';
 const BUILD_ASSETS = [/*__BUILD_ASSETS__*/];
 const CACHE = 'arc-shell-' + BUILD_ID;
-const SHELL = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/routevfx-logo.png', './geodata/countries.json', './geodata/lakes.json', './geodata/places.json', './geodata/airports.json', ...BUILD_ASSETS];
+const SHELL = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/apple-touch-icon-v2.png', './icons/routevfx-logo.png', './geodata/countries.json', './geodata/lakes.json', './geodata/places.json', './geodata/airports.json', ...BUILD_ASSETS];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));

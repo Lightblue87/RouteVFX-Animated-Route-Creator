@@ -34,6 +34,10 @@ Einmalig nötig: *Settings → Environments → github-pages → Deployment bran
 - Die Kartenstile „OpenFreeMap“ und die Online-Dienste laden Daten von Drittanbietern und fragen vorher um Erlaubnis; die Standardkarte funktioniert offline.
 - Für die Release-Matrix (CLAUDE.md §15) zählt dieser Test auf echten Geräten. Bitte pro Gerät notieren: Modell, Betriebssystem, Browser-Version, ob installiert, und was geklappt hat oder nicht (besonders MP4-Export und Freigabe-Dialog).
 
+## App-Symbol auf dem iPhone
+
+iOS lädt das Symbol nur beim Hinzufügen und merkt sich es pro Adresse. Ein Eintrag, der mit einem alten Stand angelegt wurde, behält das alte Symbol (oder zeigt nur einen Buchstaben, wenn das Laden damals scheiterte). So aktualisierst du es: alten Eintrag vom Home-Bildschirm löschen, die Seite in Safari neu laden (ggf. Website-Daten für die Seite löschen), dann *Teilen → Zum Home-Bildschirm* erneut. Das Symbol liegt unter `icons/apple-touch-icon-v2.png` (bei jeder Änderung wird der Dateiname hochgezählt, damit iOS keinen Zwischenspeicher wiederverwendet). Prüfen: Die Adresse `…/RouteVFX-Animated-Route-Creator/icons/apple-touch-icon-v2.png` muss im Browser das Logo zeigen.
+
 ## Rückbau
 
 *Settings → Pages → Unpublish site* (oder die Pages-Quelle wieder abschalten). Daten der Nutzer liegen nur lokal im jeweiligen Browser; es gibt nichts Serverseitiges zu löschen außer den Zählern in `routing_usage`.
